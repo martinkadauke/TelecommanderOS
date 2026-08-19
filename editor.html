@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Telecommander Seiten-Editor</title>
+<style>
+ body{background:#111;color:#ddd;font-family:monospace;margin:16px}
+ h1{color:#fc0;font-size:18px;margin:0 0 12px}
+ #wrap{display:flex;gap:16px;flex-wrap:wrap}
+ canvas{border:2px solid #444;image-rendering:pixelated;cursor:text;background:#000}
+ .panel{max-width:330px}
+ button{background:#222;color:#ddd;border:1px solid #555;padding:4px 8px;
+        margin:2px;cursor:pointer;font-family:monospace}
+ button:hover{border-color:#fc0}
+ .att button{width:30px;height:26px;font-weight:bold}
+ select,input{background:#222;color:#ddd;border:1px solid #555;padding:3px;
+        font-family:monospace}
+ #status{color:#6f6;min-height:1.2em}
+ .hint{color:#888;font-size:12px;line-height:1.5}
+ fieldset{border:1px solid #444;margin:8px 0}
+ legend{color:#fc0;font-size:12px}
+</style>
+</head>
+<body>
+<h1>TELECOMMANDER &mdash; Seiten-Editor</h1>
+<div id="wrap">
+ <canvas id="cv" width="960" height="480"></canvas>
+ <div class="panel">
+  <fieldset><legend>Seite</legend>
+   <select id="pagesel"></select>
+   Sub <input id="subsel" type="number" value="1" min="1" style="width:44px">
+   <button onclick="loadPage()">Laden</button><br>
+   Neu: <input id="newpage" type="number" min="0" max="999" style="width:56px"
+        placeholder="Nr">
+   <button onclick="newPage()">Anlegen</button>
+   <button onclick="savePage()" style="color:#6f6">SPEICHERN</button>
+  </fieldset>
+  <fieldset><legend>Attribute (belegen eine Zelle!)</legend>
+   <div class="att">
+    Text: <span id="atext"></span><br>
+    Mosaik: <span id="amos"></span><br>
+    <button onclick="ins(0x0D)" title="Doppelhoehe">DH</button>
+    <button onclick="ins(0x0C)" title="Normalhoehe">NH</button>
+    <button onclick="ins(0x1D)" title="Vordergrund wird Hintergrund">BG</button>
+    <button onclick="ins(0x1C)" title="schwarzer Hintergrund">SW</button>
+   </div>
+  </fieldset>
+  <fieldset><legend>Bibliothek</legend>
+   <button onclick="scan()">Scan jetzt</button>
+   <button onclick="pi('purge-probe','Probe-Cache wirklich leeren? tvplayer scannt danach neu.')">Probe-Cache leeren</button>
+   <span id="scanstate"></span>
+  </fieldset>
+  <fieldset><legend>Raspi / TV</legend>
+   <button onclick="piStatus()">Status</button>
+   <button onclick="pi('stop')">Sendeschluss</button>
+   <button onclick="pi('restart-tvplayer')">tvplayer neu</button>
+   <button onclick="pi('restart-retrokb')">retrokb neu</button>
+   <button onclick="pi('reboot','Raspberry Pi wirklich NEU STARTEN?')" style="color:#f66">Pi-Neustart</button>
+   <div id="pistatus" class="hint"></div>
+  </fieldset>
+  <div id="status"></div>
+  <div class="hint">
+   Klick setzt den Cursor, tippen schreibt (Umlaute ok).
+   Pfeile bewegen, Entf loescht.<br>
+   <b>Rechtsklick</b> auf eine Mosaik-Zelle malt die 2x3-Bloecke.<br>
+   Zelle <span id="cellinfo">-</span>
+  </div>
+ </div>
+</div>
+<script>
+const W=40,H=24,CW=24,CH=20;   // canvas cell 24x20 -> 960x480
+const PAL=["#000","#f00","#0f0","#ff0","#00f","#f0f","#0ff","#fff"];
+let FONT=null, grid=null, cur={r:0,c:0}, curPage=100, curSub=1;
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+const DE={"\u00c4":"[","\u00d6":"\\","\u00dc":"]","\u00e4":"{",
+          "\u00f6":"|","\u00fc":"}","\u00df":"~","\u00b0":"`"};
+
+function attrs(row){ // decode a row like the SAA5050: returns per-cell state
+ let fg=7,bg=0,mos=false,out=[];
+ for(const ch of row){
+  if(ch<0x20){
+   if(ch>=1&&ch<=7){fg=ch;mos=false}
+   else if(ch>=0x11&&ch<=0x17){fg=ch-0x10;mos=true}
+   else if(ch==0x1D)bg=fg; else if(ch==0x1C)bg=0;
+   out.push({ch:0x20,fg,bg,mos:false,att:ch});
+  } else out.push({ch,fg,bg,mos,att:null});
+ }
+ return out;
+}
+function draw(){
+ ctx.fillStyle="#000";ctx.fillRect(0,0,cv.width,cv.height);
+ for(let r=0;r<H;r++){
+  const cells=attrs(grid[r]);
+  for(let c=0;c<W;c++){
+   const cell=cells[c],x=c*CW,y=r*CH;
+   ctx.fillStyle=PAL[cell.bg];ctx.fillRect(x,y,CW,CH);
+   if(cell.att!==null){ // visualize the invisible attribute cell
+    ctx.strokeStyle="#333";ctx.strokeRect(x+1,y+1,CW-2,CH-2);
+    ctx.fillStyle="#666";ctx.font="9px monospace";
+    ctx.fillText(cell.att.toString(16).padStart(2,"0"),x+3,y+12);
+   } else if(cell.mos&&((cell.ch>=0x20&&cell.ch<0x40)||cell.ch>=0x60)){
+    const bits=(cell.ch&0x1F)|((cell.ch&0x40)>>1);
+    ctx.fillStyle=PAL[cell.fg];
+    for(let b=0;b<6;b++) if(bits&(1<<b))
+     ctx.fillRect(x+(b%2)*(CW/2),y+Math.floor(b/2)*(CH/3),CW/2,CH/3);
+   } else if(cell.ch>0x20&&FONT){
+    ctx.fillStyle=PAL[cell.fg];
+    const g=(cell.ch-0x20)*7;
+    for(let gr=0;gr<7;gr++){const bits=FONT[g+gr];
+     for(let gc=0;gc<5;gc++) if(bits&(0x10>>gc))
+      ctx.fillRect(x+2+gc*4,y+2+gr*2,4,2);}
+   }
+  }
+ }
+ // cursor
+ ctx.strokeStyle="#fc0";ctx.lineWidth=2;
+ ctx.strokeRect(cur.c*CW+1,cur.r*CH+1,CW-2,CH-2);
+ const ch=grid[cur.r][cur.c];
+ document.getElementById("cellinfo").textContent=
+  cur.r+","+cur.c+" = 0x"+ch.toString(16).padStart(2,"0");
+}
+function ins(b){grid[cur.r][cur.c]=b;step();draw()}
+function step(){if(cur.c<W-1)cur.c++;else if(cur.r<H-1){cur.r++;cur.c=0}}
+cv.addEventListener("mousedown",e=>{
+ const rect=cv.getBoundingClientRect();
+ const c=Math.floor((e.clientX-rect.left)/(rect.width/W));
+ const r=Math.floor((e.clientY-rect.top)/(rect.height/H));
+ if(e.button==2){ // mosaic paint: toggle the 2x3 sub-block under the pointer
+  const cells=attrs(grid[r]);
+  if(cells[c].mos||confirm("Zelle ist kein Mosaik. In Mosaik-Byte wandeln?")){
+   const sx=Math.floor(((e.clientX-rect.left)%(rect.width/W))/(rect.width/W/2));
+   const sy=Math.floor(((e.clientY-rect.top)%(rect.height/H))/(rect.height/H/3));
+   const bit=1<<(sy*2+sx);
+   let ch=grid[r][c];
+   if(ch<0x20)ch=0x20;
+   let bits=(ch&0x1F)|((ch&0x40)>>1);
+   bits^=bit;
+   grid[r][c]=0x20+(bits&0x1F)+((bits&0x20)?0x40:0);
+  }
+ } else {cur={r,c}}
+ draw();e.preventDefault();
+});
+cv.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("keydown",e=>{
+ if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT")return;
+ if(e.key==="ArrowRight"){cur.c=Math.min(W-1,cur.c+1)}
+ else if(e.key==="ArrowLeft"){cur.c=Math.max(0,cur.c-1)}
+ else if(e.key==="ArrowDown"){cur.r=Math.min(H-1,cur.r+1)}
+ else if(e.key==="ArrowUp"){cur.r=Math.max(0,cur.r-1)}
+ else if(e.key==="Backspace"){if(cur.c>0)cur.c--;grid[cur.r][cur.c]=0x20}
+ else if(e.key==="Delete"){grid[cur.r][cur.c]=0x20}
+ else if(e.key==="Enter"){if(cur.r<H-1){cur.r++;cur.c=0}}
+ else if(e.key.length===1){
+  let k=DE[e.key]??e.key;
+  const code=k.charCodeAt(0);
+  if(code>=0x20&&code<0x80){grid[cur.r][cur.c]=code;step()}
+ } else return;
+ draw();e.preventDefault();
+});
+function attButtons(){
+ const t=document.getElementById("atext"),m=document.getElementById("amos");
+ const names=["","R","G","Y","B","M","C","W"];
+ for(let c=1;c<8;c++){
+  const b=document.createElement("button");b.textContent=names[c];
+  b.style.color=PAL[c];b.onclick=()=>ins(c);t.appendChild(b);
+  const b2=document.createElement("button");b2.textContent=names[c];
+  b2.style.color=PAL[c];b2.onclick=()=>ins(0x10+c);m.appendChild(b2);
+ }
+}
+async function refreshList(){
+ const r=await fetch("/tt/list");const j=await r.json();
+ const sel=document.getElementById("pagesel");sel.innerHTML="";
+ Object.keys(j.pages).sort((a,b)=>a-b).forEach(p=>{
+  const o=document.createElement("option");
+  o.value=p;o.textContent=p+" ("+j.pages[p]+" sub)";sel.appendChild(o);});
+ document.getElementById("scanstate").textContent=
+  j.scan_running?"scan l\u00e4uft...":"";
+}
+async function loadPage(){
+ curPage=+document.getElementById("pagesel").value;
+ curSub=+document.getElementById("subsel").value||1;
+ const r=await fetch("/tt/page/"+curPage+"?sub="+curSub);
+ if(!r.ok){status("Seite fehlt");return}
+ const j=await r.json();
+ const raw=atob(j.data);
+ grid=[];for(let i=0;i<H;i++){const row=new Uint8Array(W);
+  for(let c=0;c<W;c++)row[c]=raw.charCodeAt(i*W+c);grid.push(row)}
+ status("Seite "+curPage+"."+curSub+" geladen");draw();
+}
+function newPage(){
+ const n=+document.getElementById("newpage").value;
+ if(isNaN(n)||n<0||n>999){status("Nummer 0-999");return}
+ curPage=n;curSub=1;
+ grid=[];for(let i=0;i<H;i++)grid.push(new Uint8Array(W).fill(0x20));
+ status("Neue Seite "+n+" (SPEICHERN nicht vergessen)");draw();
+}
+async function savePage(){
+ let raw="";for(let r=0;r<H;r++)for(let c=0;c<W;c++)
+  raw+=String.fromCharCode(grid[r][c]);
+ const buf=new Uint8Array(960);for(let i=0;i<960;i++)buf[i]=raw.charCodeAt(i);
+ const r=await fetch("/tt/page/"+curPage+"?sub="+curSub,
+  {method:"PUT",body:buf});
+ status(r.ok?"Gespeichert: "+curPage+"."+curSub:"Fehler beim Speichern");
+ refreshList();
+}
+async function scan(){await fetch("/tt/scan",{method:"POST"});
+ status("Scan angesto\u00dfen");setTimeout(refreshList,3000)}
+function status(s){document.getElementById("status").textContent=s}
+async function pi(action, confirmMsg){
+ if(confirmMsg && !confirm(confirmMsg)) return;
+ try{
+  const r=await fetch("/pi/"+action,{method:"POST"});
+  const j=await r.json();
+  status(j.ok||j.error||JSON.stringify(j));
+ }catch(err){status("Pi nicht erreichbar: "+err)}
+}
+async function piStatus(){
+ const el=document.getElementById("pistatus");
+ try{
+  const j=await(await fetch("/pi/status")).json();
+  const t=(j.playing||"").split("/").pop().split("&")[0]||"(Sendepause)";
+  el.textContent="L\u00e4uft: "+decodeURIComponent(t)+" @ "+
+   Math.floor(j.position_s/60)+":"+String(j.position_s%60).padStart(2,"0")+
+   " | Modus "+j.mode+(j.os_visible?" | OS an":"")+(j.random?" | Zufall":"")+
+   " | "+j.temp+" | "+j.throttled;
+ }catch(err){el.textContent="Pi nicht erreichbar"}
+}
+(async()=>{
+ const f=await(await fetch("/tt/font")).json();
+ FONT=f.font.map(h=>parseInt(h,16));
+ attButtons();await refreshList();
+ grid=[];for(let i=0;i<H;i++)grid.push(new Uint8Array(W).fill(0x20));
+ if(document.getElementById("pagesel").options.length)await loadPage();
+ else draw();
+})();
+</script>
+</body>
+</html>

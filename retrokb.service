@@ -1,0 +1,30 @@
+[Unit]
+Description=8BitDo retro keyboard bridge to Home Assistant
+Documentation=file:/etc/retrokb/retrokb.toml
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/retrokb --config /etc/retrokb/retrokb.toml
+Restart=always
+RestartSec=3
+
+# Runs as root on purpose. Debian ships /dev/input/event* as 0640 root:input,
+# so a group-only user cannot open them O_RDWR -- and EVIOCGRAB needs write.
+# The alternative is a udev rule loosening the mode; not worth the moving part
+# on a hypervisor where everything else is root anyway. Locked down instead:
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target

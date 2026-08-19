@@ -1,0 +1,15 @@
+[Unit]
+Description=Start/stop tvplayer based on the Saba TV's Shelly plug
+Documentation=file:/usr/local/bin/tvgate
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# root: its whole job is systemctl start/stop of tvplayer
+ExecStart=/usr/bin/python3 /usr/local/bin/tvgate
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

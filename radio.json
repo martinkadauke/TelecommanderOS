@@ -1,0 +1,80 @@
+{
+  "_comment": "Internet radio for page 900. Public-broadcaster streams, no account. The gateway runs the SAME spectrum-analyser filter over these as it does over local music, so radio gets a picture too. Page 900 re-reads this file on every request, so edits are live immediately; 15 stations per subpage.",
+  "stations": [
+    {
+      "name": "Deutschlandfunk",
+      "key": "dlf",
+      "url": "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"
+    },
+    {
+      "name": "SWR4 Baden-Württemberg",
+      "key": "swr4bw",
+      "url": "https://liveradio.swr.de/sw331ch/swr4bw/play.mp3"
+    },
+    {
+      "name": "SWR3",
+      "key": "swr3",
+      "url": "https://liveradio.swr.de/sw331ch/swr3/play.mp3"
+    },
+    {
+      "name": "SWR1 Baden-Württemberg",
+      "key": "swr1bw",
+      "url": "https://liveradio.swr.de/sw331ch/swr1bw/play.mp3"
+    },
+    {
+      "name": "SWR2",
+      "key": "swr2",
+      "url": "https://liveradio.swr.de/sw331ch/swr2/play.mp3"
+    },
+    {
+      "name": "Deutschlandfunk Kultur",
+      "key": "dlfkultur",
+      "url": "https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3"
+    },
+    {
+      "name": "Deutschlandfunk Nova",
+      "key": "dlfnova",
+      "url": "https://st03.sslstream.dlf.de/dlf/03/128/mp3/stream.mp3"
+    },
+    {
+      "name": "1LIVE",
+      "key": "1live",
+      "url": "https://wdr-1live-live.icecast.wdr.de/wdr/1live/live/mp3/128/stream.mp3"
+    },
+    {
+      "name": "WDR 2",
+      "key": "wdr2",
+      "url": "https://wdr-wdr2-rheinland.icecast.wdr.de/wdr/wdr2/rheinland/mp3/128/stream.mp3"
+    },
+    {
+      "name": "NDR 2",
+      "key": "ndr2",
+      "url": "https://icecast.ndr.de/ndr/ndr2/niedersachsen/mp3/128/stream.mp3"
+    },
+    {
+      "name": "Bayern 3",
+      "key": "bayern3",
+      "url": "https://dispatcher.rndfnk.com/br/br3/live/mp3/mid"
+    },
+    {
+      "name": "BR24",
+      "key": "br24",
+      "url": "https://dispatcher.rndfnk.com/br/br24/live/mp3/mid"
+    },
+    {
+      "name": "hr3",
+      "key": "hr3",
+      "url": "https://dispatcher.rndfnk.com/hr/hr3/live/mp3/high"
+    },
+    {
+      "name": "radioeins",
+      "key": "radioeins",
+      "url": "https://dispatcher.rndfnk.com/rbb/radioeins/live/mp3/mid"
+    },
+    {
+      "name": "Fritz",
+      "key": "fritz",
+      "url": "https://dispatcher.rndfnk.com/rbb/fritz/live/mp3/mid"
+    }
+  ]
+}

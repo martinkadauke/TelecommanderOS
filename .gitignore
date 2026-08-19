@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+# generated at runtime on the server, not source
+pages/
+creep_gen.json
+watched.json
+t9_de.txt
+t9_en.txt
+chat.json
+jellyfin.key
+reddit_auth.json
+*.wav
+*.bgra
+personal.json

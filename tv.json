@@ -1,0 +1,115 @@
+{
+  "_comment": "Live TV for page 800. Two kinds of entry: a fixed 'url', or a 'zdf' on-air id that the gateway resolves through ZDF's own public player API at zap time (their manifest path rotates and the player token expires, so a baked-in URL goes stale). Everything here is free-to-air public broadcasting, no account. ProSieben/Sat.1/Kabel1/RTL are commercial and have no free public stream: they need a Joyn or RTL+ account in their own apps. Page 800 re-reads this file on every request, so edits are live immediately; 15 channels per subpage.",
+  "channels": [
+    {
+      "name": "Das Erste",
+      "key": "daserste",
+      "url": "https://daserste-live.ard-mcdn.de/daserste/live/hls/de/master.m3u8",
+      "epg": "daserste"
+    },
+    {
+      "name": "ZDF",
+      "key": "zdf",
+      "zdf": "247onAir-201",
+      "epg": ""
+    },
+    {
+      "name": "arte",
+      "key": "arte",
+      "zdf": "247onAir-208",
+      "url": "https://artesimulcast.akamaized.net/hls/live/2030993/artelive_de/index.m3u8",
+      "epg": ""
+    },
+    {
+      "name": "3sat",
+      "key": "dreisat",
+      "zdf": "247onAir-204",
+      "epg": ""
+    },
+    {
+      "name": "ZDFneo",
+      "key": "zdfneo",
+      "zdf": "247onAir-202",
+      "epg": ""
+    },
+    {
+      "name": "ZDFinfo",
+      "key": "zdfinfo",
+      "zdf": "247onAir-203",
+      "epg": ""
+    },
+    {
+      "name": "phoenix",
+      "key": "phoenix",
+      "zdf": "247onAir-205",
+      "epg": ""
+    },
+    {
+      "name": "tagesschau24",
+      "key": "tagesschau24",
+      "url": "https://tagesschau-live.ard-mcdn.de/tagesschau/live/hls/de/master.m3u8",
+      "epg": "tagesschau24"
+    },
+    {
+      "name": "WDR Fernsehen",
+      "key": "wdr",
+      "url": "https://wdr-live.ard-mcdn.de/wdr/live/hls/de/master.m3u8",
+      "epg": "wdr"
+    },
+    {
+      "name": "BR Fernsehen",
+      "key": "br",
+      "url": "https://mcdn.br.de/br/fs/bfs_sued/hls/de/master.m3u8",
+      "epg": "br"
+    },
+    {
+      "name": "ARD alpha",
+      "key": "alpha",
+      "url": "https://mcdn.br.de/br/fs/ard_alpha/hls/de/master.m3u8",
+      "epg": "alpha"
+    },
+    {
+      "name": "hr-fernsehen",
+      "key": "hr",
+      "url": "https://hr-live.ard-mcdn.de/hr/live/hls/de/master.m3u8",
+      "epg": "hr"
+    },
+    {
+      "name": "MDR",
+      "key": "mdr",
+      "url": "https://mdr-live.ard-mcdn.de/mdr/live/hls/de/master.m3u8",
+      "epg": "mdr"
+    },
+    {
+      "name": "SR Fernsehen",
+      "key": "sr",
+      "url": "https://sr-live.ard-mcdn.de/sr/live/hls/de/master.m3u8",
+      "epg": "sr"
+    },
+    {
+      "name": "KiKA",
+      "key": "kika",
+      "zdf": "247onAir-207",
+      "url": "https://kika-live.ard-mcdn.de/kika/live/hls/de/master.m3u8",
+      "epg": ""
+    },
+    {
+      "name": "DW Deutsch",
+      "key": "dwde",
+      "url": "https://dwamdstream103.akamaized.net/hls/live/2015526/dwstream103/index.m3u8",
+      "epg": ""
+    },
+    {
+      "name": "DW English",
+      "key": "dwen",
+      "url": "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8",
+      "epg": ""
+    },
+    {
+      "name": "Red Bull TV",
+      "key": "redbull",
+      "url": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
+      "epg": ""
+    }
+  ]
+}

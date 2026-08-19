@@ -1,0 +1,382 @@
+# retrokb configuration
+#
+# Verified against the real hardware on kadaukemox, 2026-08-18.
+
+# Take exclusive control of the matched devices (EVIOCGRAB), so button presses
+# do not also type into mox's console. Set false only while debugging.
+grab = true
+
+
+# --------------------------------------------------------------------------
+# Which input devices to claim.
+#
+# The keyboard exposes two interfaces (event10 and event11) under the same
+# vendor:product. Only event11 carries the add-on input, but we claim both:
+# the numbers are not stable across replug, and grabbing the quiet one costs
+# nothing.
+# --------------------------------------------------------------------------
+[[devices]]
+vendor  = "0x2dc8"          # 8BitDo
+product = "0x5200"          # 8BitDo Retro Keyboard, wired
+
+
+# --------------------------------------------------------------------------
+# Where events go. Home Assistant is VM 255 on a static IP, so this stays
+# correct no matter which Proxmox node HA is running on.
+#
+# The webhook ID is a bearer secret: anyone on the LAN who knows it can fire
+# the automation. Generate a random one and match it in the HA automation.
+# --------------------------------------------------------------------------
+[homeassistant]
+# Empty = no Home Assistant output at all. That is the right setting for the
+# joystick proof-of-concept: the band goes straight to WLED, so HA has nothing
+# to do yet. Fill this in when you want buttons or cheat codes to reach HA:
+#   http://192.168.1.254:8123/api/webhook/<random-id>
+webhook_url = ""
+timeout_s = 2.0
+
+
+# --------------------------------------------------------------------------
+# key name -> semantic input name
+#
+# Left side:  evdev key name. Right side: what HA branches on.
+#
+# The joystick sends the standard HID arrow usages (0x7004F-52), i.e. it is
+# indistinguishable from the keyboard's own arrow cluster. That is fine here:
+# the keyboard lives on a shelf and we grab it exclusively, so the arrow keys
+# have no other job.
+#
+# It is an 8-way stick: a diagonal closes two switches, so you will get two
+# press events (e.g. joy_up AND joy_left). Handle or ignore that in HA.
+# --------------------------------------------------------------------------
+[bindings]
+
+KEY_UP    = "joy_up"
+KEY_DOWN  = "joy_down"
+KEY_LEFT  = "joy_left"
+KEY_RIGHT = "joy_right"
+
+# --- TV mode control (see [tv] below) --------------------------------------
+# ESC swaps what the arrows above mean: light-snake control, or mpv transport.
+# Both jobs read the SAME physical keys (the joystick sends plain arrows, see
+# above), so exactly one can be listening at a time -- this is the switch.
+KEY_ESC   = "tv_tt_c"       # keyboard ESC now just opens/closes tcOS
+KEY_SPACE = "tv_playpause"
+# --- TelecommanderOS keys ---------------------------------------------------
+# The OS is numpad-driven (2.4GHz dongle, pending). KP codes below are the
+# EXPECTED standard keypad codes -- run `retrokb --probe` when the dongle
+# arrives and correct any that differ (the C key especially is a guess:
+# many keypads put NumLock there). Keyboard aliases marked TEMP exist so the
+# OS is testable before the numpad arrives; remove them afterwards.
+KEY_KP0        = "tv_tt_0"
+KEY_KP1        = "tv_tt_1"
+KEY_KP2        = "tv_tt_2"
+KEY_KP3        = "tv_tt_3"
+KEY_KP4        = "tv_tt_4"
+KEY_KP5        = "tv_tt_5"
+KEY_KP6        = "tv_tt_6"
+KEY_KP7        = "tv_tt_7"
+KEY_KP8        = "tv_tt_8"
+KEY_KP9        = "tv_tt_9"
+# Remote layout per Martin (2026-08-18): + / - volume, / previous file,
+# x next file, ENTER play/pause, . flips subpages, backspace goes back
+# (digit if one is pending, else page history), C = select-or-OS-toggle
+# (bound per-device below: the C key emits KEY_ESC).
+KEY_KPENTER    = "tv_playpause"
+KEY_KPPLUS     = "tv_volup"
+KEY_KPMINUS    = "tv_voldown"
+KEY_KPASTERISK = "tv_nextfile"      # the numpad's x key
+KEY_KPSLASH    = "tv_prevfile"      # the numpad's / key
+KEY_KPDOT      = "tv_dot"   # OS open: Unterseiten blaettern / TV: Bildformat
+KEY_BACKSPACE  = "tv_tt_back"
+# TEMP keyboard aliases until the numpad dongle arrives:
+KEY_0 = "tv_tt_0"
+KEY_1 = "tv_tt_1"
+KEY_2 = "tv_tt_2"
+KEY_3 = "tv_tt_3"
+KEY_4 = "tv_tt_4"
+KEY_5 = "tv_tt_5"
+KEY_6 = "tv_tt_6"
+KEY_7 = "tv_tt_7"
+KEY_8 = "tv_tt_8"
+KEY_9 = "tv_tt_9"
+KEY_ENTER = "tv_playpause"
+KEY_MINUS = "tv_tt_minus"
+KEY_EQUAL = "tv_tt_plus"
+
+# --- 8BitDo Retro 18 Numpad via 2.4GHz dongle (measured 2026-08-18):
+# digits/ENTER/+/- emit standard KP codes; the C key emits KEY_ESC (handled
+# per-device below so it clears instead of toggling snake mode).
+[[devices]]
+vendor  = "0x2dc8"
+product = "0x5204"          # 8BitDo Retro 18 Numpad
+
+# TAB is the main keyboard's own key, not an add-on -- picked because it needs
+# no onboard remap and nobody types on this shelf keyboard anyway. Toggles
+# between the source's native aspect and a crop that fills a 4:3 screen (the
+# Saba is a real 4:3 CRT; the library is mostly 16:9, and how that comes out
+# through the SCART/adapter/CRT chain isn't something to predict from here --
+# hence a manual toggle rather than trying to auto-detect the "right" answer).
+KEY_TAB   = "tv_aspect_toggle"
+
+# --- ABXY pad (mapped 2026-08-18 via the keyboard's onboard macro mode) ---
+# The pad ships unmapped; these were assigned on the keyboard itself, no
+# Ultimate Software needed. Colours follow the XBOX cap convention:
+# A=green, B=red, X=blue, Y=yellow.
+# KEY_Z is the Y button: evdev names keys by US-layout POSITION, and on a
+# QWERTZ board the Y cap sits where US has Z.
+KEY_A = "abxy_green"
+KEY_B = "abxy_red"
+KEY_X = "abxy_blue"
+KEY_Z = "abxy_yellow"
+
+# --- Dual Super Buttons: PENDING (same story, 1 jack) ---------------------
+# KEY_F17 = "red_left"
+# KEY_F18 = "red_right"
+
+# Inputs that tick repeatedly while held.
+#
+# In LIGHT mode, only up/down repeat: they drive the band along 300 pixels, so
+# they need to sweep, while left/right just pick a shelf (repeating them would
+# blow past the ends instantly -- see _wled(), which only acts on left/right
+# during "press", so their hold-ticks are harmless no-ops in that mode).
+#
+# left/right are listed here too because TV mode reuses them for rewind/fast-
+# forward, which DO need to repeat while held. One list serves both modes.
+#
+# This keyboard reports no EV_REP, so retrokb generates these ticks itself.
+# hold_interval_ms x step_px sets the LIGHT-mode sweep speed: 60ms x 6px
+# crosses a 300-LED strip in about 3 seconds.
+repeating = ["joy_up", "joy_down", "joy_left", "joy_right",
+             "tv_volup", "tv_voldown",
+             # C needs ticks so a long press can be timed: 2s = back
+             # to 100 from anything, 5s = switch the set off as well.
+             "tv_tt_c"]
+hold_interval_ms = 60
+
+# Inputs that additionally send "release" -- for hold-to-do-something.
+# joy_right needs this to drop mpv's fast-forward speed back to 1x when the
+# stick is let go; joy_left doesn't strictly need it (rewind has no persistent
+# state to undo) but is listed for symmetry.
+release = ["joy_left", "joy_right", "tv_tt_c"]
+
+
+# --------------------------------------------------------------------------
+# Cheat codes (numpad) -- OFF until the numpad is probed.
+#
+# retrokb buffers digits; HA decides what a code means. Events fired:
+#   code_armed / code_digit {"count":n} / code {"value":"1234"}
+#   code_timeout / code_cancel
+# Use code_digit and code_timeout to blink the WLED strips as you type: it is
+# the only feedback channel you have, and it is a good one.
+# --------------------------------------------------------------------------
+[codes]
+enabled = false
+
+arm_key    = "KEY_KPASTERISK"   # "" listens continuously instead
+cancel_key = "KEY_KPMINUS"
+length     = 4                  # auto-submit at N digits; 0 = require submit_key
+submit_key = "KEY_KPENTER"
+timeout_s  = 5.0
+
+
+# --------------------------------------------------------------------------
+# WLED band renderer
+#
+# Sent over WLED's UDP REALTIME protocol (DRGBW), not the JSON API. This is
+# deliberate and was learned the hard way: the JSON API writes stored config,
+# so painting the band with segments permanently added a segment to every
+# strip. That flipped Home Assistant's WLED entities into their multi-segment
+# model (main entity becomes brightness-only) and broke unrelated automations.
+#
+# Realtime is an overlay -- no segment layout, no on/off state, nothing HA
+# reads. The band is a LEASE: held while you use the stick, refreshed by a
+# keepalive, and released automatically after release_after_s, at which point
+# each strip reverts to whatever Home Assistant last set.
+#
+# Model: ONE band of light. X moves it between shelves, Y slides it along the
+# 300 pixels, ABXY recolours it.
+# --------------------------------------------------------------------------
+[wled]
+enabled = true
+leds = 300              # verified: all four strips report 300
+band_len = 8            # length of the lit band, in pixels
+step_px = 6             # pixels moved per tick while the stick is held
+brightness = 200
+port = 21324            # WLED realtime UDP port
+
+# Seconds WLED waits after our last packet before handing the strip back to
+# Home Assistant. Doubles as a dead-man switch: if retrokb crashes, the lights
+# recover on their own instead of being stuck showing an 8px band.
+# Keep this LOW: it is also how long a shelf you have swept past keeps showing
+# a stale band, which is what caused doubles and triples at 2 seconds.
+realtime_timeout_s = 1
+
+# How often we refresh while holding the band. Must stay below
+# realtime_timeout_s or the strip drops the lease between inputs.
+keepalive_s = 0.4
+
+# Idle seconds before the band gives up. 0 = never; the band then persists
+# until something else touches the shelf. That is the intended behaviour --
+# see watch_ha.
+release_after_s = 0
+
+# Poll the active shelf's stored state and drop the band the moment anything
+# else changes it. Our overlay provably never writes stored state, so any
+# change is a Home Assistant automation, the WLED app, or a physical button.
+# Per-shelf: an HA command aimed at r1 will not disturb a band sitting on r2.
+watch_ha = true
+watch_interval_s = 1.0
+
+# RGBW strips, so colours are [R, G, B, W]. Default is pure white channel.
+default_color = [0, 0, 0, 255]
+
+# The explosion is rendered by retrokb as a shockwave, NOT a WLED built-in
+# effect -- triggering one of those would need a JSON write, which is exactly
+# what breaks Home Assistant.
+explode_seconds = 2.0
+
+# Shelf order left-to-right as the joystick walks them.
+[[wled.shelves]]
+n = 1
+host = "192.168.1.90"       # WLED.UG.Martin.RegalRechts1
+[[wled.shelves]]
+n = 2
+host = "192.168.1.186"      # WLED.UG.Martin.RegalRechts2
+[[wled.shelves]]
+n = 3
+host = "192.168.1.40"       # WLED.UG.Martin.RegalRechts3
+[[wled.shelves]]
+n = 4
+host = "192.168.1.247"      # WLED.UG.Martin.RegalRechts4
+
+# ARROW KEYS ARE THE SOURCE OF TRUTH (user decision 2026-08-18): the joystick
+# gets physically rotated to match the arrows, never the other way around.
+# UP/DOWN pick the shelf (the shelves are stacked vertically), LEFT/RIGHT
+# slide the band along the strip (the strips run horizontally).
+[wled.actions]
+shelf_prev   = "joy_up"         # press only; toward shelf 1
+shelf_next   = "joy_down"       # press only; toward shelf 4
+band_forward = "joy_left"       # repeats while held (direction per Martin, 2026-08-18)
+band_back    = "joy_right"      # repeats while held
+explode      = ["red_left", "red_right"]
+
+# Colours the ABXY keycaps set.
+[wled.colors]
+abxy_green  = [0, 255, 0, 0]
+abxy_blue   = [0, 0, 255, 0]
+abxy_yellow = [255, 190, 0, 0]
+abxy_red    = [255, 0, 0, 0]
+
+
+# --------------------------------------------------------------------------
+# TV mode: random movies/TV over HDMI (tvplayer.service), driven from the
+# same keyboard. ESC (bound above) swaps the arrows/space between this and
+# the light snake -- see _route() in retrokb.py for exactly what that means.
+#
+# left  tap  = restart current file, or jump to the previous one if you're
+#              already near the start (a second tap acts like "previous")
+# left  hold = rewind
+# right tap  = next file
+# right hold = fast-forward at ff_speed (a true mpv speed change, smooth)
+# up/down    = volume
+# space      = play/pause
+#
+# Rewind has no equivalent true-speed path: reverse playback is not reliably
+# supported by mpv/ffmpeg on this hardware, so it is approximated as repeated
+# seek-backs instead -- asymmetric with fast-forward on purpose.
+# --------------------------------------------------------------------------
+[tv]
+enabled = true
+socket = "/run/tvplayer/mpv.sock"      # must match tvplayer.py's --input-ipc-server
+
+# ARROW KEYS ARE THE SOURCE OF TRUTH (same as [wled.actions]): literal
+# arrow semantics, joystick physically rotated to match.
+# Tap-only transport (scrubbing removed 2026-08-18: hold-to-FF at 3x outran
+# the live transcode pipe's buffer -- sprint/stall/refill chaos -- and wasn't
+# worth keeping for direct files either).
+prev     = "joy_left"     # tap: start over; within restart_threshold_s of the start, previous video
+next     = "joy_right"    # tap: next file
+vol_up   = "joy_down"     # louder (repeats while held) -- swapped per test 2026-08-18
+vol_down = "joy_up"       # quieter (repeats while held)
+
+# TAB 4:3 toggle: DISABLED. Pressing it forced the vc4 overlay plane into a
+# scale config the driver rejects, wedging DRM into an atomic-commit-failure
+# loop (audio keeps playing, screen shows nothing; first wedge needed a power
+# cycle). Re-enable only with a driver-safe implementation, e.g. cropping
+# server-side in the transcode gateway.
+aspect_toggle = false
+
+
+vol_steps = 10            # notches from silent to full; one tap = one notch
+restart_threshold_s = 5.0 # left-tap within this many seconds of the start = previous video
+cmd_timeout_s = 0.3       # local unix socket; anything slower means mpv is stuck
+
+
+# --------------------------------------------------------------------------
+# TelecommanderOS (teletext) -- pages come from the BROADCASTER (the
+# Telecommander container on Kadaukeserver); this receiver renders them.
+# Edit pages at http://192.168.1.238:8203/ -- the OS's local dynamic pages
+# are only 111 (Jetzt laeuft) and 500 (Einstellungen). Page 599 on the TV
+# triggers a library rescan at the broadcaster.
+# --------------------------------------------------------------------------
+# Keys that mean something different when they come FROM THE NUMPAD.
+[numpad]
+product = "0x5204"
+[numpad.bindings]
+# C = enter/leave the OS (digits half-typed: first press clears them).
+# ENTER confirms numeric commands inside the OS; outside = play/pause.
+KEY_ESC = "tv_tt_c"
+
+[teletext]
+enabled = true
+broadcaster = "http://192.168.1.238:8203"
+shm = "/dev/shm/retrokb-tt.bgra"
+overlay_id = 1
+# Sound effects (snake, the 2410 fanfare) go straight out over HDMI with no
+# mixer in between, so they get their own trim. 0.0 silences them.
+sound_gain = 0.15
+sound_device = "plughw:CARD=vc4hdmi,DEV=0"
+state_file = "/var/lib/tvplayer/os-state.json"
+playlist = "/run/tvplayer/playlist.m3u8"
+probe_cache = "/var/lib/tvplayer/probecache.json"
+# CRT overscan safe area, percent PER EDGE (the Saba's raster sits shifted
+# up-left: top and right need more inset than bottom and left). Tune by eye,
+# restart retrokb after changing.
+overscan_top_pct    = 9.0
+overscan_bottom_pct = 5.0
+overscan_left_pct   = 2.0
+overscan_right_pct  = 6.5
+
+
+# --------------------------------------------------------------------------
+# NES emulator (page 400). RetroArch renders straight to DRM, which means
+# tvplayer must be stopped first -- the display has exactly one master.
+# While a game runs the keyboard is UNGRABBED so RetroArch receives the
+# joystick and ABXY; the numpad stays grabbed so C always quits back to tcOS.
+# --------------------------------------------------------------------------
+[emulator]
+enabled = true
+# Must match tvplayer's User= : the emulator and mpv have to agree on who
+# owns DRM, or the handoff strands the bare console on screen.
+user = "martin"
+command = ["retroarch", "--config", "/etc/retrokb/retroarch.cfg",
+           "-L", "/usr/local/lib/libretro/fceumm_libretro.so"]
+
+# server path -> the Pi's read-only NFS mount of the curated ROM folder
+[emulator.roots]
+"/mnt/user/Games/Emulation/NES/Auswahl" = "/mnt/roms"
+
+
+# --------------------------------------------------------------------------
+# TV power. The Pi is always on, the Saba is not, so any numpad press wakes
+# its Shelly plug -- via Home Assistant, which owns the action (automation
+# "TelecommanderOS: TV-Steckdose", webhook telecommander-tv).
+#
+# ON only. The joystick and ABXY never trigger it: they drive the shelf
+# lights and must keep working with the TV dark. Switching OFF is page 500
+# item 7 and needs two presses.
+# --------------------------------------------------------------------------
+[tv_power]
+webhook = "http://192.168.1.254:8123/api/webhook/telecommander-tv"
+wake_debounce_s = 30

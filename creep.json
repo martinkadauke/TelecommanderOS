@@ -1,0 +1,533 @@
+{
+  "_comment": "Page 666. One entry per subpage, cycled with the . key. Lines must be 36 characters or fewer. Umlauts are written normally; the character generator maps them to the German G0 set. Page 666 re-reads this file on every request, so edits are live immediately. The dropout corruption is added on top, re-rolled every fetch.",
+  "pages": [
+    {
+      "title": "KEIN SENDEPLATZ",
+      "lines": [
+        "Diese Seite steht in keinem",
+        "Sendeplan. Sie wurde im Oktober",
+        "1987 aus dem Umlauf genommen.",
+        "",
+        "Trotzdem sind Sie hier.",
+        "",
+        "Ihr Gerät hat sie angefordert.",
+        "Nicht Sie."
+      ]
+    },
+    {
+      "title": "PROTOKOLL",
+      "lines": [
+        "03:14  Bildröhre warm",
+        "03:14  Zuschauer erfasst: 1",
+        "03:15  Zuschauer erfasst: 2",
+        "03:15  Sie sind allein im Raum",
+        "03:16  Korrektur folgt",
+        "03:41  Korrektur: Sie waren",
+        "       allein",
+        "",
+        "Die Uhr oben rechts geht richtig."
+      ]
+    },
+    {
+      "title": "DER TON",
+      "lines": [
+        "Haben Sie das Summen bemerkt?",
+        "",
+        "Es sind 15625 Hertz. So klingt",
+        "eine Zeilenablenkung. Normal.",
+        "",
+        "Es war auch letzte Nacht zu hören.",
+        "",
+        "Das Gerät war aus."
+      ]
+    },
+    {
+      "title": "TESTBILD",
+      "lines": [
+        "Das Testbild lief von 1963",
+        "bis 1997.",
+        "",
+        "Es hat in dieser Zeit",
+        "1245960 Stunden gesendet.",
+        "",
+        "Es hat in dieser Zeit",
+        "1245960 Stunden zugesehen."
+      ]
+    },
+    {
+      "title": "ZEILE 24",
+      "lines": [
+        "Videotext hat 24 Zeilen.",
+        "Bitte zählen Sie nach.",
+        "",
+        "Wenn Sie 23 gezählt haben,",
+        "ist alles in Ordnung.",
+        "",
+        "Wenn Sie 24 gezählt haben,",
+        "drehen Sie sich bitte nicht um."
+      ]
+    },
+    {
+      "title": "DER TECHNIKER",
+      "lines": [
+        "Ein Techniker war 1991 hier.",
+        "Er hat die Rückwand geöffnet",
+        "und nichts gefunden.",
+        "",
+        "Er hat sie wieder geschlossen.",
+        "",
+        "Gegangen ist er nie."
+      ]
+    },
+    {
+      "title": "IHRE ANTENNE",
+      "lines": [
+        "Ihre Antenne zeigt nach Südwest.",
+        "",
+        "Dort steht kein Sender.",
+        "Dort stand auch nie einer.",
+        "",
+        "Der Empfang ist trotzdem gut.",
+        "Er wird jedes Jahr besser."
+      ]
+    },
+    {
+      "title": "RÜCKKANAL",
+      "lines": [
+        "Videotext ist eine Einbahn.",
+        "Der Sender sendet.",
+        "Das Gerät empfängt.",
+        "",
+        "Ihres sendet seit 2004 zurück.",
+        "",
+        "Wir haben nie gefragt, was."
+      ]
+    },
+    {
+      "title": "GEBÜHREN",
+      "lines": [
+        "Haushalt 1, Zeitraum",
+        "1987 bis heute.",
+        "",
+        "Betrag: 0,00",
+        "",
+        "Begründung:",
+        "Der Haushalt gilt seit langem",
+        "als nicht mehr bewohnt."
+      ]
+    },
+    {
+      "title": "WARTUNG",
+      "lines": [
+        "Nächste Wartung:",
+        "14. März 1989, 04:00 Uhr",
+        "",
+        "Sie wurde durchgeführt.",
+        "Sie wird wieder durchgeführt.",
+        "",
+        "Bitte bleiben Sie liegen."
+      ]
+    },
+    {
+      "title": "DAS ZWEITE BILD",
+      "lines": [
+        "Hinter jedem Bild liegt ein",
+        "zweites, um eine Zeile versetzt.",
+        "",
+        "Kneifen Sie die Augen zusammen.",
+        "",
+        "Es ist immer dasselbe Motiv.",
+        "Es ist dieses Zimmer."
+      ]
+    },
+    {
+      "title": "STROMAUSFALL",
+      "lines": [
+        "Am 9. Februar fiel im ganzen",
+        "Ort der Strom aus.",
+        "Sechs Stunden lang.",
+        "",
+        "Dieses Gerät hat weitergesendet.",
+        "",
+        "Wir haben es nicht bemerkt.",
+        "Sie auch nicht."
+      ]
+    },
+    {
+      "title": "UNTERTITEL",
+      "lines": [
+        "Untertitel zu dieser Seite:",
+        "",
+        "[ruhiges Atmen]",
+        "[Atmen wird schneller]",
+        "[ein Stuhl rückt]",
+        "[Schritte, sehr nah]",
+        "[Atmen hört auf]"
+      ]
+    },
+    {
+      "title": "ZUSCHAUERPOST",
+      "lines": [
+        "Wir erhielten vier Zuschriften",
+        "zu dieser Seite.",
+        "",
+        "Alle vier in derselben",
+        "Handschrift.",
+        "",
+        "Keine war je abgeschickt worden."
+      ]
+    },
+    {
+      "title": "FREQUENZ",
+      "lines": [
+        "Kanal 4, 62,25 MHz",
+        "",
+        "Belegt seit 1961",
+        "Freigegeben 1998",
+        "Belegt seit 1998",
+        "",
+        "Der Sendemast wurde 2003",
+        "gesprengt."
+      ]
+    },
+    {
+      "title": "DIE PAUSE",
+      "lines": [
+        "Zwischen zwei Bildern liegt",
+        "ein kurzes Dunkel.",
+        "",
+        "Fünfzigmal in jeder Sekunde",
+        "ist dieser Raum schwarz.",
+        "",
+        "In diesem Dunkel geschieht es."
+      ]
+    },
+    {
+      "title": "KINDERPROGRAMM",
+      "lines": [
+        "Das Kinderprogramm wurde",
+        "1985 eingestellt.",
+        "",
+        "Es läuft weiter.",
+        "Nur nachts. Nur hier.",
+        "Nur wenn ein Kind im Haus ist.",
+        "",
+        "Guten Abend."
+      ]
+    },
+    {
+      "title": "NACHTPROGRAMM",
+      "lines": [
+        "03:33  Sendepause",
+        "03:33  Sendepause",
+        "03:33  Sendepause",
+        "03:33  Sendepause",
+        "",
+        "Die Uhr steht nicht still.",
+        "Wir senden nur diese Minute."
+      ]
+    },
+    {
+      "title": "STANDBILD",
+      "lines": [
+        "Dies ist ein Standbild.",
+        "",
+        "Bitte beobachten Sie es",
+        "eine Minute lang.",
+        "",
+        "Es hat sich bewegt.",
+        "Sie haben geblinzelt."
+      ]
+    },
+    {
+      "title": "BILDSTÖRUNG",
+      "lines": [
+        "Der Schirm flimmert nicht.",
+        "Das Gerät ist in Ordnung.",
+        "",
+        "Was Sie im Augenwinkel sehen,",
+        "steht wirklich dort.",
+        "",
+        "Drehen Sie sich nicht um."
+      ]
+    },
+    {
+      "title": "DER RAUM",
+      "lines": [
+        "Raumtiefe      4,10 m",
+        "Deckenhöhe     2,45 m",
+        "Personen           1",
+        "Wärmequellen       2",
+        "",
+        "Die zweite bewegt sich nicht."
+      ]
+    },
+    {
+      "title": "SPIEGEL",
+      "lines": [
+        "Schalten Sie ab.",
+        "Der Schirm wird dunkel.",
+        "Sie sehen sich darin.",
+        "",
+        "Warten Sie, bis Sie sich",
+        "bewegen.",
+        "",
+        "Warten Sie."
+      ]
+    },
+    {
+      "title": "EINSCHALTQUOTE",
+      "lines": [
+        "Seite 666",
+        "",
+        "Zuschauer heute       1",
+        "Zuschauer gestern     1",
+        "Zuschauer 1987        1",
+        "",
+        "Immer einer.",
+        "Nie derselbe."
+      ]
+    },
+    {
+      "title": "DAS ARCHIV",
+      "lines": [
+        "Wir archivieren jede Sendung.",
+        "",
+        "Band 4112:",
+        "Wohnzimmer, Abend,",
+        "ein Sessel, ein Gerät,",
+        "ein Zuschauer.",
+        "",
+        "Laufzeit: noch offen."
+      ]
+    },
+    {
+      "title": "VORSCHAU",
+      "lines": [
+        "Gleich in diesem Programm:",
+        "",
+        "Sie lesen diese Zeile.",
+        "Sie lächeln kurz.",
+        "Sie schauen zur Tür.",
+        "",
+        "Wir hatten recht."
+      ]
+    },
+    {
+      "title": "SIGNALWEG",
+      "lines": [
+        "Antenne, Kabel, Tuner,",
+        "Decoder, Bildröhre, Auge,",
+        "Sehnerv.",
+        "",
+        "Ab hier haben wir keine",
+        "Messgeräte mehr.",
+        "",
+        "Ab hier vertrauen wir Ihnen."
+      ]
+    },
+    {
+      "title": "DIE ZWEITE STIMME",
+      "lines": [
+        "Im Rauschen liegt eine Stimme.",
+        "Sie ist sehr leise.",
+        "",
+        "Drehen Sie lauter.",
+        "Noch lauter.",
+        "",
+        "Jetzt hört sie Sie auch."
+      ]
+    },
+    {
+      "title": "KALIBRIERUNG",
+      "lines": [
+        "Bitte sitzen Sie still.",
+        "",
+        "Helligkeit wird angepasst.",
+        "Kontrast wird angepasst.",
+        "Zuschauer wird angepasst.",
+        "",
+        "Vielen Dank."
+      ]
+    },
+    {
+      "title": "ABSCHALTUNG",
+      "lines": [
+        "Das analoge Fernsehen wurde",
+        "vor Jahren abgeschaltet.",
+        "",
+        "Diese Seite erreicht Sie",
+        "über keinen bekannten Weg.",
+        "",
+        "Guten Abend."
+      ]
+    },
+    {
+      "title": "GARANTIE",
+      "lines": [
+        "Garantie      24 Monate",
+        "Erworben      März 1983",
+        "Abgelaufen    März 1985",
+        "",
+        "Letzter Servicebesuch:",
+        "vorgestern.",
+        "",
+        "Sie waren einkaufen."
+      ]
+    },
+    {
+      "title": "DIE LISTE",
+      "lines": [
+        "Wir führen eine Liste der",
+        "Geräte, die noch antworten.",
+        "",
+        "1983  4120 Geräte",
+        "1999    61 Geräte",
+        "2026      1 Gerät",
+        "",
+        "Danke, dass Sie noch da sind."
+      ]
+    },
+    {
+      "title": "ENDE DER ÜBERTRAGUNG",
+      "lines": [
+        "Bitte schalten Sie nicht ab.",
+        "",
+        "Solange das Bild steht, sehen",
+        "wir, was Sie sehen.",
+        "",
+        "Danach sehen wir nur noch Sie.",
+        "",
+        "        Gute Nacht."
+      ]
+    },
+    {
+      "title": "BLUTBILD",
+      "anim": {
+        "kind": "fill",
+        "colour": 1,
+        "secs": 14
+      },
+      "lines": [
+        "Bitte bleiben Sie ruhig sitzen.",
+        "",
+        "Der Bildinhalt steigt.",
+        "",
+        "Das ist normal.",
+        "Das war schon immer normal."
+      ]
+    },
+    {
+      "title": "ES TROPFT",
+      "anim": {
+        "kind": "drip",
+        "colour": 1,
+        "secs": 9
+      },
+      "lines": [
+        "Von der Decke ueber Ihnen kommt",
+        "nichts. Wir haben nachgesehen.",
+        "",
+        "Es kommt von innen.",
+        "",
+        "Aus dem Geraet."
+      ]
+    },
+    {
+      "title": "ZEILENPRUEFUNG",
+      "anim": {
+        "kind": "sweep",
+        "colour": 7,
+        "secs": 5
+      },
+      "lines": [
+        "Wir pruefen jede Zeile einzeln.",
+        "",
+        "Zeile 1 bis 24: in Ordnung.",
+        "",
+        "Die Zeile dazwischen faellt",
+        "durch."
+      ]
+    },
+    {
+      "title": "SIE SEHEN SIE",
+      "anim": {
+        "kind": "eyes",
+        "colour": 1,
+        "secs": 3
+      },
+      "lines": [
+        "Nicht erschrecken.",
+        "",
+        "Was hier aufleuchtet, sind nur",
+        "Bildpunkte.",
+        "",
+        "Bildpunkte blinzeln nicht."
+      ]
+    },
+    {
+      "title": "STOERUNG 12",
+      "anim": {
+        "kind": "flicker",
+        "colour": 5,
+        "secs": 2
+      },
+      "lines": [
+        "Kurzzeitige Bildstoerung.",
+        "",
+        "Ursache: unbekannt.",
+        "Dauer: seit 1987.",
+        "",
+        "Bitte sehen Sie hindurch."
+      ]
+    },
+    {
+      "title": "DER PEGEL",
+      "anim": {
+        "kind": "fill",
+        "colour": 4,
+        "secs": 20
+      },
+      "lines": [
+        "Der Pegel im Keller steigt",
+        "seit gestern.",
+        "",
+        "Sie wohnen im dritten Stock.",
+        "",
+        "Trotzdem."
+      ]
+    },
+    {
+      "title": "ROTE ZEILE",
+      "anim": {
+        "kind": "sweep",
+        "colour": 1,
+        "secs": 3
+      },
+      "lines": [
+        "Die rote Zeile sucht etwas.",
+        "",
+        "Sie geht jede Zeile durch,",
+        "immer wieder, seit Stunden.",
+        "",
+        "Bei Ihnen bleibt sie kurz stehen."
+      ]
+    },
+    {
+      "title": "NACHTFUELLUNG",
+      "anim": {
+        "kind": "fill",
+        "colour": 2,
+        "secs": 24
+      },
+      "lines": [
+        "Nachts fuellt sich der Bildschirm",
+        "langsam von unten.",
+        "",
+        "Morgens ist er wieder leer.",
+        "",
+        "Wir wissen nicht, wohin es geht."
+      ]
+    }
+  ]
+}

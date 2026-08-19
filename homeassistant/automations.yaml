@@ -1,0 +1,60 @@
+# retrokb -> Home Assistant.
+#
+# The light band is NOT here -- retrokb renders it straight to the WLED
+# ESP32s, because HA cannot address "LEDs 138-146". What HA gets is the full
+# input stream, so you can hang any additional behaviour off the same presses.
+#
+# CHANGE BEFORE USE: webhook_id must match homeassistant.webhook_url in
+# retrokb.toml. Generate one:
+#   python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+
+- id: retrokb_inputs
+  alias: "RetroKB: inputs"
+  description: >
+    Everything the keyboard sends. Held joystick directions arrive as repeated
+    "hold" events every 60ms, so this must be mode: queued -- the default mode
+    silently drops overlapping runs.
+  mode: queued
+  max: 40
+  triggers:
+    - trigger: webhook
+      webhook_id: "retrokb-CHANGE-THIS-TO-SOMETHING-RANDOM"
+      local_only: true
+      allowed_methods: [POST]
+  conditions:
+    # The joystick is retrokb's business; ignore its firehose here.
+    - condition: template
+      value_template: "{{ not trigger.json.input.startswith('joy_') }}"
+  actions:
+    - choose:
+        # --- cheat codes: enable [codes] in retrokb.toml once the numpad is
+        # --- probed, then fill these in.
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.json.input == 'code' }}"
+          sequence:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ trigger.json.value == '0000' }}"
+                  sequence:
+                    - action: light.turn_off
+                      target:
+                        entity_id: all
+              default:
+                - action: persistent_notification.create
+                  data:
+                    title: RetroKB
+                    message: "Unknown code {{ trigger.json.value }}"
+
+        # --- the big red buttons already explode the shelves from retrokb.
+        # --- this is where you add anything else they should also do.
+        # - conditions:
+        #     - condition: template
+        #       value_template: >
+        #         {{ trigger.json.input in ['red_left', 'red_right']
+        #            and trigger.json.action == 'press' }}
+        #   sequence:
+        #     - action: media_player.play_media
+        #       target: {entity_id: media_player.somewhere}
+        #       data: {media_content_id: explosion.mp3, media_content_type: music}
