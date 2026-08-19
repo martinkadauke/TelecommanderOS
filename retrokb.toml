@@ -148,17 +148,14 @@ KEY_Z = "abxy_yellow"
 # hold_interval_ms x step_px sets the LIGHT-mode sweep speed: 60ms x 6px
 # crosses a 300-LED strip in about 3 seconds.
 repeating = ["joy_up", "joy_down", "joy_left", "joy_right",
-             "tv_volup", "tv_voldown",
-             # C needs ticks so a long press can be timed: 2s = back
-             # to 100 from anything, 5s = switch the set off as well.
-             "tv_tt_c"]
+             "tv_volup", "tv_voldown"]
 hold_interval_ms = 60
 
 # Inputs that additionally send "release" -- for hold-to-do-something.
 # joy_right needs this to drop mpv's fast-forward speed back to 1x when the
 # stick is let go; joy_left doesn't strictly need it (rewind has no persistent
 # state to undo) but is listed for symmetry.
-release = ["joy_left", "joy_right", "tv_tt_c"]
+release = ["joy_left", "joy_right"]
 
 
 # --------------------------------------------------------------------------

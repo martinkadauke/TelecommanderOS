@@ -809,7 +809,6 @@ class Service:
         self.sel = selectors.DefaultSelector()
         # target -> monotonic time its next "hold" tick is due
         self._held: dict[str, float] = {}
-        self._c_down, self._c_fired = 0.0, 0   # C-held-down tracking
         self.running = True
 
     # -- device lifecycle ---------------------------------------------------
@@ -931,41 +930,6 @@ class Service:
         elif target == self.act_band_back:
             r.band_step(-1)
 
-    C_PANIC_S, C_POWER_S = 3.0, 5.0
-
-    def tick_c_hold(self, now: float) -> None:
-        """Time a held C from the main loop.
-
-        Deliberately NOT driven by the hold-tick machinery: that needs the key
-        to be listed as repeating and needs the device to report key-up, and
-        when it silently did neither the whole feature was dead with nothing
-        in the log. The loop runs anyway and needs neither.
-        """
-        if not self._c_down:
-            return
-        held = now - self._c_down
-        if held >= self.C_POWER_S and self._c_fired < 2:
-            self._c_fired = 2
-            self.tt.panic()
-            self.tv_power("tv_off")
-            LOG.info("C held %.0fs: everything off, plug off", self.C_POWER_S)
-        elif held >= self.C_PANIC_S and self._c_fired < 1:
-            self._c_fired = 1
-            if self.game:
-                self.end_game()
-            else:
-                self.tt.panic()
-            LOG.info("C held %.0fs: back to 100", self.C_PANIC_S)
-
-    def next_c_hold(self) -> float | None:
-        if not self._c_down:
-            return None
-        if self._c_fired < 1:
-            return self._c_down + self.C_PANIC_S
-        if self._c_fired < 2:
-            return self._c_down + self.C_POWER_S
-        return None
-
     def tick_holds(self, now: float) -> None:
         for target, due in list(self._held.items()):
             if now >= due:
@@ -985,22 +949,6 @@ class Service:
         and the source of a whole bug family (numpad dead after a restart,
         ABXY silently swallowed while "tv mode" was on). Deleted.
         """
-        if target != "tv_tt_c" and action == "press":
-            self._c_down = 0.0
-        if target == "tv_tt_c":
-            # Hold C: 2 s kills whatever is on screen and goes home, 5 s also
-            # switches the set's plug off. The short tap still toggles the OS
-            # on press, so holding first toggles and THEN rescues -- which is
-            # the right way round when the point is to get out of something
-            # that is stuck.
-            if action == "press":
-                self._c_down, self._c_fired = time.monotonic(), 0
-            elif action == "hold":
-                return          # the loop times this, not the hold ticks
-            elif action == "release":
-                self._c_down = 0.0
-                return
-
         if target.startswith("tv_tt_"):
             if action == "press" and self.tt.enabled:
                 self.tt.key(target[6:])
@@ -1199,7 +1147,6 @@ class Service:
 
             timeout = next_scan - now
             for deadline in (self.codes.next_deadline(), self.next_hold(),
-                             self.next_c_hold(),
                              self.tt.next_deadline() if self.tt.enabled else None):
                 if deadline is not None:
                     timeout = min(timeout, max(0.0, deadline - now))
@@ -1218,7 +1165,6 @@ class Service:
 
             now = time.monotonic()
             self.tick_holds(now)
-            self.tick_c_hold(now)
             self.codes.tick(now)
             if self.tt.enabled:
                 self.tt.tick()

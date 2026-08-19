@@ -1637,6 +1637,12 @@ def creep_order():
             # nothing written left to space them with; the tail is unavoidable
             order.append(empty[ei])
             ei += 1
+    # pinned pages are put back where they belong, and whatever the shuffle
+    # had put there takes their old place, so nothing is lost
+    for pos, slot in sorted(creep_pins().items()):
+        if pos <= len(order) and slot in order:
+            i = order.index(slot)
+            order[i], order[pos - 1] = order[pos - 1], order[i]
     _creep_order["hour"], _creep_order["order"] = hour, order
     print("creep order reshuffled: %d written, %d empty"
           % (len(ready), len(empty)), flush=True)
@@ -1725,19 +1731,41 @@ def personal():
         return {}
 
 
-def creep_pages():
-    """Live from creep.json, plus anything in personal.json, so pages can be
-    added without touching code."""
+def creep_raw():
+    """The page definitions, creep.json first then anything personal."""
     try:
         with open(os.path.join(APP, "creep.json"), encoding="utf-8") as fh:
             pages = json.load(fh).get("pages")
         pages = list(pages or []) + list(personal().get("creep_pages") or [])
-        if isinstance(pages, list) and pages:
-            return [(p.get("title", ""), p.get("lines") or [],
-                     p.get("anim"), p.get("art")) for p in pages]
+        if pages:
+            return pages
     except (OSError, ValueError, AttributeError):
         pass
-    return [(t, l, None, None) for t, l in CREEP]
+    return [{"title": t, "lines": l} for t, l in CREEP]
+
+
+def creep_pages():
+    """Live from creep.json, plus anything in personal.json, so pages can be
+    added without touching code."""
+    return [(p.get("title", ""), p.get("lines") or [],
+             p.get("anim"), p.get("art")) for p in creep_raw()]
+
+
+def creep_pins():
+    """{position: slot} for pages that must always appear at one subpage.
+
+    The hourly shuffle is what keeps 666 from being a fixed list, but a page
+    that only means something at one number has to be exempt from it.
+    """
+    pins = {}
+    for i, p in enumerate(creep_raw()):
+        try:
+            pos = int(p.get("pin") or 0)
+        except (TypeError, ValueError):
+            pos = 0
+        if 1 <= pos <= CREEP_SUBS:
+            pins[pos] = i + 1
+    return pins
 
 
 def creep_page(sub):
