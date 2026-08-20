@@ -27,6 +27,11 @@ ExecStart=/usr/bin/python3 /usr/local/bin/tvplayer
 ExecStopPost=/bin/sleep 2
 Restart=always
 RestartSec=5
+# mpv exits 4 when it is told to quit, which is exactly what happens every
+# time tvgate stops the player because the television was switched off. Without
+# this, systemd logs a normal shutdown as "Failed with result 'exit-code'" and
+# the journal reads like a string of crashes when nothing has gone wrong.
+SuccessExitStatus=4
 
 [Install]
 WantedBy=multi-user.target
