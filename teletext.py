@@ -521,8 +521,11 @@ class Teletext:
         self._hum = None               # the 666 drone, while that page is up
         self._hum_building = False     # a variant being rendered offline
         self._hum_sub = 0              # last 666 subpage seen
+        self._hum_due = []             # seconds into the drone where it glitches
+        self._hum_at = 0.0             # when the current drone started
+        self.flash = None              # set by the router: flash the room
         self._hum_pages = 0            # pages turned since a glitch
-        self._hum_thresh = 5           # pages until the next one
+        self._hum_thresh = 3           # pages until the next one
         self.invent = None             # a page being made up on the spot
         self.news = None               # the news reader, while it is open
         self._anim = [0.0, 0.0]        # [phase 0..1, next frame due]
@@ -971,6 +974,22 @@ class Teletext:
     HUM_DIRTY = 3
     HUM_VARIANTS = HUM_CLEAN + HUM_DIRTY
 
+    def _hum_marks(self, variant, rate=8000, secs=30):
+        """Where the interference sits in a variant, as (sample, kind).
+
+        Drawn from its OWN generator so it can be recomputed later without
+        rendering the audio again -- which is what lets the lights be fired at
+        exactly the moment the sound happens, from a file that was written
+        hours ago.
+        """
+        if variant < self.HUM_CLEAN:
+            return []
+        rnd = random.Random(4000 + variant)
+        out = [(rnd.randrange(rate, rate * secs - rate * 2),
+                rnd.choice(("dirt", "fall", "click")))
+               for _ in range(rnd.randint(1, 2))]
+        return sorted(out)
+
     def _hum_file(self, variant=0):
         """A 30 s drone with interference baked in, looping without a seam.
 
@@ -1001,10 +1020,7 @@ class Teletext:
             buf.append(int(amp * v / 2.35))
         rnd = random.Random(1000 + variant)
         gamp = int(32767 * 0.13 * self.snd_gain)
-        count = 0 if variant < self.HUM_CLEAN else rnd.randint(1, 2)
-        for _ in range(count):
-            at = rnd.randrange(rate, n - rate * 2)
-            kind = rnd.choice(("dirt", "fall", "click"))
+        for at, kind in self._hum_marks(variant, rate, secs):
             if kind == "dirt":                       # a burst of noise
                 for k in range(rnd.randint(260, 700)):
                     buf[at + k] += rnd.randint(-gamp, gamp)
@@ -1054,7 +1070,8 @@ class Teletext:
                     # enough pages have gone by: let the next loop be a dirty
                     # one, then start counting towards a fresh target
                     self._hum_pages = 0
-                    self._hum_thresh = random.randint(3, 9)
+                    # Martin asked for half again as often: 3-9 pages -> 2-6
+                    self._hum_thresh = random.randint(2, 6)
                     v = random.randrange(self.HUM_CLEAN, self.HUM_VARIANTS)
                 else:
                     v = random.randrange(self.HUM_CLEAN)
@@ -1062,6 +1079,10 @@ class Teletext:
                     int(self.snd_gain * 99), v)
                 if os.path.exists(path):
                     self._hum = self._play_wav(path)
+                    # line the lights up with the interference in THIS file
+                    self._hum_at = time.monotonic()
+                    self._hum_due = [at / 8000.0
+                                     for at, _k in self._hum_marks(v)]
                 elif not self._hum_building:
                     # 30 s of trigonometry costs this Pi about three seconds.
                     # Building it on the main loop would freeze the OS mid
@@ -1079,6 +1100,7 @@ class Teletext:
             if self._hum.poll() is None:
                 self._hum.terminate()
             self._hum = None
+            self._hum_due = []
 
     def _scores(self, game="snake"):
         try:
@@ -2894,6 +2916,8 @@ class Teletext:
             due.append(self.news["poll"])
         if self._hum is not None:
             due.append(time.monotonic() + 1.0)
+        if self._hum_due:
+            due.append(self._hum_at + self._hum_due[0])
         if self.invent and self.visible:
             due.append(self.invent["poll"])
         if self.visible and self.live and self.live_page == P_RADIO:
@@ -2930,6 +2954,12 @@ class Teletext:
         if self.chat and self.chat.get("job") and now >= self.chat["poll"]:
             self._chat_poll()
         self._hum_check()
+        while self._hum_due and now >= self._hum_at + self._hum_due[0]:
+            # the interference is inside the drone, so its timing is known:
+            # fire the room at exactly that moment
+            self._hum_due.pop(0)
+            if self.flash:
+                self.flash()
         spec = self._anim_spec()
         if spec and self.visible and now >= self._anim[1]:
             self._anim[0] = (self._anim[0] + 1.0 / (self.ANIM_FPS *

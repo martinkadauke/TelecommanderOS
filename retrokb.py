@@ -211,6 +211,10 @@ class Renderer(threading.Thread):
         self.enabled = bool(w.get("enabled"))
         self.dry_run = dry_run
         self.hosts = {int(s["n"]): s["host"] for s in w.get("shelves", [])}
+        # every strip in the room, not just the four the band runs on -- the
+        # 666 flash is meant to catch the whole space
+        self.flash_hosts = [h for h in (w.get("flash_hosts") or [])] or \
+            list(self.hosts.values())
         self.leds = int(w.get("leds", 300))
         self.band_len = int(w.get("band_len", 8))
         self.step_px = int(w.get("step_px", 6))
@@ -239,6 +243,7 @@ class Renderer(threading.Thread):
         self.last_input = 0.0
         self._dirty = False
         self._explode = False
+        self._flash = None
         self._running = True
         self._baseline = None
         self._baseline_shelf = None
@@ -270,6 +275,19 @@ class Renderer(threading.Thread):
         self.color = list(color)
         self._touch()
 
+    def flash(self, colour=(255, 0, 0), seconds=0.18) -> None:
+        """Every strip in the room, one colour, for a moment.
+
+        Realtime UDP again, and that is the whole point: it is an overlay, so
+        it needs no JSON write, cannot disturb segment config or anything Home
+        Assistant reads, and the strips return to whatever they were showing
+        on their own once we stop sending. Nothing has to be saved or restored.
+        """
+        with self.cv:
+            self._flash = (list(colour), float(seconds))
+            self.last_input = time.monotonic()
+            self.cv.notify()
+
     def explode(self) -> None:
         with self.cv:
             self.active = True
@@ -287,17 +305,21 @@ class Renderer(threading.Thread):
     def run(self) -> None:
         while True:
             with self.cv:
-                if not self._dirty and not self._explode:
+                if not self._dirty and not self._explode and not self._flash:
                     # Holding the band means refreshing before the strip times
                     # out; while idle there is nothing to wake for.
                     self.cv.wait(self.keepalive if self.active else None)
                 if not self._running:
                     return
                 boom, self._explode = self._explode, False
+                flash, self._flash = self._flash, None
                 self._dirty = False
                 shelf, pos = self.shelf, self.pos
                 color, active, last = list(self.color), self.active, self.last_input
 
+            if flash:
+                self._do_flash(flash[0], flash[1])
+                continue
             if boom:
                 self._explosion(color)
                 continue
@@ -363,6 +385,21 @@ class Renderer(threading.Thread):
             buf[off:off + 4] = px
         return buf
 
+    def _do_flash(self, colour: list, seconds: float) -> None:
+        fps = 30
+        rgbw = (list(colour) + [0, 0, 0, 0])[:4]
+        px = bytes(min(255, int(c)) for c in rgbw)
+        buf = self._frame()
+        for i in range(self.leds):
+            off = 2 + i * 4
+            buf[off:off + 4] = px
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            for host in self.flash_hosts:
+                self._send_host(host, buf)
+            time.sleep(1.0 / fps)
+        # and then simply stop: the realtime timeout hands each strip back
+
     def _explosion(self, color: list) -> None:
         """A shockwave rendered by us, not a WLED built-in effect -- triggering
         one of those would need a JSON write, the very thing we stopped doing."""
@@ -393,6 +430,14 @@ class Renderer(threading.Thread):
             for shelf in self.hosts:
                 self._send(shelf, buf)
             time.sleep(1.0 / fps)
+
+    def _send_host(self, host: str, buf: bytearray) -> None:
+        if not host or self.dry_run:
+            return
+        try:
+            self.sock.sendto(bytes(buf), (host, self.port))
+        except OSError as exc:
+            LOG.debug("WLED %s: %s", host, exc)
 
     def _send(self, shelf: int, buf: bytearray) -> None:
         host = self.hosts.get(shelf)
@@ -773,6 +818,7 @@ class Service:
         self.tv_restart_threshold = float(tv.get("restart_threshold_s", 5.0))
         self.tt = teletext_mod.Teletext(cfg, self._tv_cmd, self._tv_query, LOG,
                                         self.launch_game, self.tv_power)
+        self.tt.flash = self._flash_room
         # The Pi runs around the clock, the Saba does not. A numpad press
         # wakes its Shelly plug through Home Assistant -- HA owns the action,
         # this end only asks. Deliberately ON-only: nothing you can press by
@@ -780,6 +826,7 @@ class Service:
         # page 500, where it takes an explicit choice.
         tp = cfg.get("tv_power", {})
         self.tvp_url = str(tp.get("webhook") or "")
+        self.flash_url = str(tp.get("flash_webhook") or "")
         self.tvp_debounce = float(tp.get("wake_debounce_s", 30))
         self._tvp_last = 0.0
         em = cfg.get("emulator", {})
@@ -1202,6 +1249,25 @@ class Service:
         self.tt.update_saver()       # authoritative: real file -> no logo
         time.sleep(0.7)      # video params need the decoder to settle
         self._tv_cmd(["set_property", "panscan", self._auto_panscan()])
+
+    def _flash_room(self) -> None:
+        """A red blink across every light in the room, then straight back.
+
+        The strips go over realtime UDP, which reverts by itself. Anything
+        Home Assistant owns and we cannot address directly (the skylights)
+        goes through a webhook that snapshots and restores on that side.
+        """
+        self.renderer.flash((255, 0, 0), 0.18)
+        if self.flash_url:
+            def _post():
+                try:
+                    req = urllib.request.Request(
+                        self.flash_url, data=b"{}", method="POST",
+                        headers={"Content-Type": "application/json"})
+                    urllib.request.urlopen(req, timeout=3).close()
+                except (urllib.error.URLError, OSError, TimeoutError) as exc:
+                    LOG.debug("flash webhook failed: %s", exc)
+            threading.Thread(target=_post, daemon=True).start()
 
     def tv_power(self, action: str) -> None:
         """Ask Home Assistant to switch the Saba's plug. Fire-and-forget in a

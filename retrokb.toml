@@ -233,6 +233,19 @@ default_color = [0, 0, 0, 255]
 # what breaks Home Assistant.
 explode_seconds = 2.0
 
+# Every WLED in the room, for the 666 red flash. The band above only runs on
+# the four shelves; this list is wider on purpose -- the flash is meant to
+# catch the whole space. Realtime UDP, so no JSON write and no restore needed:
+# each strip returns to what it was showing once we stop sending.
+flash_hosts = [
+    "192.168.1.90",         # WLED.UG.Martin.RegalRechts1
+    "192.168.1.186",        # WLED.UG.Martin.RegalRechts2
+    "192.168.1.40",         # WLED.UG.Martin.RegalRechts3
+    "192.168.1.247",        # WLED.UG.Martin.RegalRechts4
+    "192.168.1.244",        # WLED.UG.L1  (Regal links)
+    "192.168.1.165",        # Fallout
+]
+
 # Shelf order left-to-right as the joystick walks them.
 [[wled.shelves]]
 n = 1
@@ -376,4 +389,8 @@ command = ["retroarch", "--config", "/etc/retrokb/retroarch.cfg",
 # --------------------------------------------------------------------------
 [tv_power]
 webhook = "http://192.168.1.254:8123/api/webhook/telecommander-tv"
+# The 666 red blink. Only the lights we cannot address directly go through
+# here -- the WLED strips are driven over realtime UDP, which reverts on its
+# own and needs no snapshot. HA snapshots and restores the skylights.
+flash_webhook = "http://192.168.1.254:8123/api/webhook/telecommander-666"
 wake_debounce_s = 30
