@@ -21,9 +21,18 @@ StateDirectory=tvplayer
 # breathing room for the previous mpv to release DRM master: restarting
 # without it once wedged the vc4 driver into an atomic-commit failure loop
 # that pegged the CPU until a power cycle
+# The framebuffer console re-attaches itself whenever mpv exits and hands
+# DRM back -- which happens every time the television is switched off. So the
+# set comes on showing a login prompt until the player catches up. noconsole
+# only runs once at boot, so the unbind has to be repeated here, on both ends
+# of every run. The + prefix runs these as root; the player itself does not.
+ExecStartPre=+/bin/sh -c 'echo 0 > /sys/class/vtconsole/vtcon1/bind || true'
+ExecStartPre=+/bin/sh -c 'dd if=/dev/zero of=/dev/fb0 bs=1M count=8 2>/dev/null || true'
 ExecStartPre=/bin/sleep 2
 ExecStart=/usr/bin/python3 /usr/local/bin/tvplayer
 # same reason, other edge: settle after stop before anything regrabs DRM
+ExecStopPost=+/bin/sh -c 'echo 0 > /sys/class/vtconsole/vtcon1/bind || true'
+ExecStopPost=+/bin/sh -c 'dd if=/dev/zero of=/dev/fb0 bs=1M count=8 2>/dev/null || true'
 ExecStopPost=/bin/sleep 2
 Restart=always
 RestartSec=5
