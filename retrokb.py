@@ -1250,14 +1250,14 @@ class Service:
         time.sleep(0.7)      # video params need the decoder to settle
         self._tv_cmd(["set_property", "panscan", self._auto_panscan()])
 
-    def _flash_room(self) -> None:
+    def _flash_room(self, seconds: float = 0.18) -> None:
         """A red blink across every light in the room, then straight back.
 
         The strips go over realtime UDP, which reverts by itself. Anything
         Home Assistant owns and we cannot address directly (the skylights)
         goes through a webhook that snapshots and restores on that side.
         """
-        self.renderer.flash((255, 0, 0), 0.18)
+        self.renderer.flash((255, 0, 0), seconds)
         if self.flash_url:
             def _post():
                 try:

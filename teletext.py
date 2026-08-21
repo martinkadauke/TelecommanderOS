@@ -513,6 +513,7 @@ class Teletext:
         self.sel = ""                  # browser selection carried to the page
         self.music = None              # the queued album, if music is playing
         self.music_base = 0            # its index of mpv playlist position 0
+        self.music_secs = []           # length of each queued track
         self._vol_until = 0.0          # when the volume meter comes off again
         self.snake = None              # the easter egg, while it is running
         self.photo = None              # a picture page, while one is up
@@ -520,6 +521,7 @@ class Teletext:
         self.chat = None               # the assistant, while its page is open
         self._hum = None               # the 666 drone, while that page is up
         self._hum_building = False     # a variant being rendered offline
+        self._hum_kind = "drone"       # drone, or a page's own sound
         self._hum_sub = 0              # last 666 subpage seen
         self._hum_due = []             # seconds into the drone where it glitches
         self._hum_at = 0.0             # when the current drone started
@@ -599,7 +601,8 @@ class Teletext:
                 "qr": (obj.get("links") or {}).get("qr", ""),
                 # a page may ask to be animated; without carrying this through
                 # the engine never sees a spec and every page stays still
-                "anim": obj.get("anim")}
+                "anim": obj.get("anim"),
+                "mode": obj.get("mode")}
         self._pcache[key] = (time.monotonic() + 30, rows, meta)
         if len(self._pcache) > 16:
             self._pcache.pop(next(iter(self._pcache)))
@@ -798,6 +801,8 @@ class Teletext:
         self.last_remote = None
         self.pipe_offset = 0
         self.music, self.music_base = list(pl), 0
+        self.music_secs = list(
+            ((self._meta or {}).get("links") or {}).get("seconds") or [])
         urls = [self._music_url(p) for p in pl]
         self.tv_cmd(["playlist-clear"])
         self.tv_cmd(["loadfile", urls[0], "replace"])
@@ -823,23 +828,41 @@ class Teletext:
             i = self.music_base
         return min(max(0, i), len(self.music or [1]) - 1)
 
+    def _timeline(self, pg, row, pos, total):
+        """0:42 ----|--------- 3:45
+
+        Plain characters rather than mosaic blocks: every colour change is a
+        spacing attribute that eats a cell, and a bar made of them would lose
+        four cells of its own width to say so.
+        """
+        pos = max(0, int(pos or 0))
+        total = int(total or 0)
+        width = 20
+        at = int(width * pos / total) if total > 0 else 0
+        at = min(width - 1, max(0, at))
+        put(pg, row, 1, alpha(WHITE) + T("%5s " % self._hms(pos)) +
+            alpha(CYAN) + T("-" * at) +
+            alpha(YELLOW) + T("|") +
+            alpha(CYAN) + T("-" * (width - 1 - at)) +
+            alpha(WHITE) + T(" %s" % (self._hms(total) if total else "--:--")))
+        return pg
+
     def _page_music(self):
         pg = blank_page()
         header(pg, self.page, None)
         idx = self.music_index()
         artist, album, title = self._music_meta(self.music[idx])
         put(pg, 2, 2, alpha(YELLOW) + DH + T("MUSIK"))
-        put(pg, 5, 2, alpha(WHITE) + T(title[:36]))
-        put(pg, 6, 2, alpha(CYAN) + T(artist[:36]))
-        if album:
-            put(pg, 7, 2, alpha(CYAN) + T(album[:36]))
-        put(pg, 9, 2, alpha(GREEN) +
-            T("Titel %d/%d" % (idx + 1, len(self.music))) +
-            alpha(WHITE) + T("   " + self._hms(self.tv_query("time-pos") or 0)))
+        put(pg, 5, 2, alpha(CYAN) + T(artist[:36]))
+        put(pg, 6, 2, alpha(CYAN) + T(album[:36]))
+        put(pg, 7, 2, alpha(WHITE) + T(title[:36]))
+        secs = self.music_secs[idx] if idx < len(self.music_secs) else 0
+        self._timeline(pg, 9, self.tv_query("time-pos") or 0, secs)
+        put(pg, 11, 2, alpha(GREEN) +
+            T("Titel %d/%d" % (idx + 1, len(self.music))))
         if idx + 1 < len(self.music):
-            put(pg, 11, 2, alpha(CYAN) + T("danach:"))
-            put(pg, 12, 2, alpha(WHITE) +
-                T(self._music_meta(self.music[idx + 1])[2][:36]))
+            put(pg, 12, 2, alpha(CYAN) + T("danach: ") + alpha(WHITE) +
+                T(self._music_meta(self.music[idx + 1])[2][:27]))
         put(pg, 21, 2, alpha(CYAN) + T("600 = Musik   0 ENTER = Schluss"))
         return pg
 
@@ -974,6 +997,59 @@ class Teletext:
     HUM_DIRTY = 3
     HUM_VARIANTS = HUM_CLEAN + HUM_DIRTY
 
+    # A short, hard loop instead of the drone: eight beats over 4.8 s. The
+    # tones are chosen so every one completes a WHOLE number of cycles in that
+    # time (40 = 192/4.8, 41.04 = 197/4.8, 80 = 384/4.8), which is what lets it
+    # repeat without a click. 40 against 41.04 beats roughly once a second and
+    # is what makes it feel wrong rather than merely low.
+    MENACE_SECS = 4.8
+    MENACE_BEATS = 8
+
+    def _menace_beats(self):
+        step = self.MENACE_SECS / self.MENACE_BEATS
+        return [i * step for i in range(self.MENACE_BEATS)]
+
+    def _menace_file(self):
+        rate = 8000
+        n = int(rate * self.MENACE_SECS)
+        path = "/dev/shm/retrokb-menace-%02d.wav" % int(self.snd_gain * 99)
+        if os.path.exists(path):
+            return path
+        amp = 32767 * 0.42 * self.snd_gain
+        buf = []
+        for i in range(n):
+            t = i / float(rate)
+            v = (math.sin(2 * math.pi * 40.0 * t)
+                 + math.sin(2 * math.pi * 41.04 * t)
+                 + 0.30 * math.sin(2 * math.pi * 80.0 * t))
+            buf.append(int(amp * v / 2.3))
+        hit = int(32767 * 0.55 * self.snd_gain)
+        for k, at_s in enumerate(self._menace_beats()):
+            at = int(at_s * rate)
+            accent = (k % 4 == 0)
+            length = int(rate * (0.16 if accent else 0.09))
+            for j in range(length):
+                if at + j >= n:
+                    break
+                decay = 1.0 - j / float(length)
+                tt = j / float(rate)
+                # a low thud, and on the accents a dissonant tritone above it
+                v = math.sin(2 * math.pi * 55.0 * tt)
+                if accent:
+                    v += 0.5 * math.sin(2 * math.pi * 77.8 * tt)
+                buf[at + j] += int(hit * decay * decay * v)
+        frames = bytearray()
+        for v in buf:
+            v = 32767 if v > 32767 else (-32768 if v < -32768 else v)
+            frames += struct.pack("<h", v)
+        fh = wave.open(path, "wb")
+        fh.setnchannels(1)
+        fh.setsampwidth(2)
+        fh.setframerate(rate)
+        fh.writeframes(bytes(frames))
+        fh.close()
+        return path
+
     def _hum_marks(self, variant, rate=8000, secs=30):
         """Where the interference sits in a variant, as (sample, kind).
 
@@ -1061,6 +1137,33 @@ class Teletext:
         """
         want = bool(self.visible and self.page == P_CREEP
                     and self.snd_dev and self.snd_gain > 0)
+        kind = "menace" if (self._meta or {}).get("mode") == "menace" \
+            else "drone"
+        if want and kind != self._hum_kind:
+            # the page changed what it wants to hear: stop the old one now
+            # rather than letting it finish its loop
+            if self._hum is not None and self._hum.poll() is None:
+                self._hum.terminate()
+            self._hum, self._hum_due = None, []
+            self._hum_kind = kind
+        if want and kind == "menace":
+            if self._hum is None or self._hum.poll() is not None:
+                path = "/dev/shm/retrokb-menace-%02d.wav" % int(
+                    self.snd_gain * 99)
+                if os.path.exists(path):
+                    self._hum = self._play_wav(path)
+                    self._hum_at = time.monotonic()
+                    self._hum_due = list(self._menace_beats())
+                elif not self._hum_building:
+                    self._hum_building = True
+
+                    def _build_m():
+                        try:
+                            self._menace_file()
+                        finally:
+                            self._hum_building = False
+                    threading.Thread(target=_build_m, daemon=True).start()
+            return
         if want:
             if self._hum_sub != self.sub:
                 self._hum_sub = self.sub
@@ -1101,6 +1204,7 @@ class Teletext:
                 self._hum.terminate()
             self._hum = None
             self._hum_due = []
+            self._hum_kind = "drone"
 
     def _scores(self, game="snake"):
         try:
@@ -2920,7 +3024,8 @@ class Teletext:
             due.append(self._hum_at + self._hum_due[0])
         if self.invent and self.visible:
             due.append(self.invent["poll"])
-        if self.visible and self.live and self.live_page == P_RADIO:
+        if self.visible and (self.music or
+                             (self.live and self.live_page == P_RADIO)):
             due.append(self._np[0])
         if self.visible and self._anim_spec():
             due.append(self._anim[1])
@@ -2941,6 +3046,12 @@ class Teletext:
             self.show()
         if self.visible and now >= self._clock_at:
             self.repaint()
+        if (self.visible and self.music and self.page == P_NOW
+                and now >= self._np[0]):
+            # the timeline would otherwise only move once a minute, when the
+            # clock in the header ticks
+            self._np = (now + 1.0, self._np[1], self._np[2])
+            self.repaint()
         if self.snake and not self.snake["dead"] and now >= self.snake["next"]:
             self.snake["blink"] += 1
             self._snake_step()
@@ -2959,7 +3070,8 @@ class Teletext:
             # fire the room at exactly that moment
             self._hum_due.pop(0)
             if self.flash:
-                self.flash()
+                # on the beat: short and hard. A glitch gets a longer blink.
+                self.flash(0.07 if self._hum_kind == "menace" else 0.18)
         spec = self._anim_spec()
         if spec and self.visible and now >= self._anim[1]:
             self._anim[0] = (self._anim[0] + 1.0 / (self.ANIM_FPS *

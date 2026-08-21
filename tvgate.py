@@ -35,7 +35,10 @@ import urllib.request
 
 SHELLY = "http://192.168.1.216/rpc/Switch.GetStatus?id=0"
 UNIT = "tvplayer.service"
-POLL_S = 15
+# 4 s, not 15: this is the delay between switching the set on and getting a
+# picture, and the whole of it is spent looking at a blank screen. One cheap
+# HTTP call to a plug on the same LAN is not worth stretching that out.
+POLL_S = 4
 
 # Two distinct ways the display goes wrong, both needing the same cure:
 #  1. the vc4 atomic-commit loop (audio plays, screen frozen/black)

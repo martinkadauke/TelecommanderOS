@@ -315,8 +315,11 @@ def music_tracks_page(sel, sub):
         put(pg, 8, 4, alpha(RED) + T("Keine Titel"))
     put(pg, 22, 2, alpha(CYAN) + T("Nr + ENTER spielt ab hier das Album"))
     # the whole album travels with the page so choosing track 3 can queue 4,
-    # 5, 6... without a second round trip
-    return pg, total, {"items": links, "playlist": paths}
+    # 5, 6... without a second round trip. Durations come along too: the
+    # tracks are streamed as MPEG-TS, which carries no length, so without
+    # this the receiver could never draw a timeline.
+    return pg, total, {"items": links, "playlist": paths,
+                       "seconds": [_duration(p) or 0 for p in paths]}
 
 
 def clean_track(name):
@@ -1748,7 +1751,7 @@ def creep_pages():
     """Live from creep.json, plus anything in personal.json, so pages can be
     added without touching code."""
     return [(p.get("title", ""), p.get("lines") or [],
-             p.get("anim"), p.get("art")) for p in creep_raw()]
+             p.get("anim"), p.get("art"), p.get("mode")) for p in creep_raw()]
 
 
 def creep_pins():
@@ -1779,9 +1782,9 @@ def creep_page(sub):
     for nxt in order[pos:pos + 2]:
         if nxt > len(pages):
             creep_generated(nxt, ahead=True)
-    art = None
+    art = mode = None
     if slot <= len(pages):
-        title, lines, anim, art = pages[slot - 1]
+        title, lines, anim, art, mode = pages[slot - 1]
     else:
         got = creep_generated(slot)
         if got is None:
@@ -1814,7 +1817,14 @@ def creep_page(sub):
         put(pg, rr, 1, mosaic(RED) + bytes([_r.choice((0x7F, 0x6B))]) * 3)
     put(pg, 22, 2, alpha(RED) + T(". = weiter    C = zur}ck") +
         alpha(RED) + T("   %d/%d" % (sub, total)))
-    return pg, total, ({"anim": anim} if anim else {})
+    meta = {}
+    if anim:
+        meta["anim"] = anim
+    if mode:
+        # a page may ask for its own soundtrack; the receiver decides what
+        # that means
+        meta["mode"] = mode
+    return pg, total, meta
 
 
 # --- internet radio -------------------------------------------------------
@@ -3057,7 +3067,7 @@ def generate():
         # already lands there, so it would only be clutter here.
         rows = [("Filme", "200", RED),
                 ("Serien", "300", GREEN),
-                ("Musik", "600", BLUE),
+                ("Musik", "600", WHITE),
                 ("Spiele", "400", CYAN),
                 ("Fernsehen", "800", YELLOW),
                 ("Radio", "900", MAGENTA),
