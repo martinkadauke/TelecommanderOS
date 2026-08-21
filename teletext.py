@@ -421,7 +421,8 @@ class Screensaver(threading.Thread):
 P_NOW, P_DESC, P_SET, P_TV = 111, 112, 500, 800
 P_MUSIC = 600
 P_RADIO = 900
-P_CHAT = 950
+P_CHAT = 950                  # the television, talked to
+P_RPG = 410                   # the television, played with
 P_NEWS_AI = 710               # ChatCRT News, all five levels on one page
 P_CREEP = 666
 # (scheme, language). `.` walks this list -- Martin asked for one key that
@@ -523,6 +524,10 @@ class Teletext:
         self._hum = None               # the 666 drone, while that page is up
         self._hum_building = False     # a variant being rendered offline
         self._hum_kind = "drone"       # drone, or a page's own sound
+        self._bt_seen = []             # devices the last scan found
+        self._bt_busy = False          # a scan running
+        self._bt_sel = ""              # highlighted device
+        self._bt_msg = ""              # what pairing is doing
         self._hum_sub = 0              # last 666 subpage seen
         self._hum_due = []             # seconds into the drone where it glitches
         self._hum_at = 0.0             # when the current drone started
@@ -1405,9 +1410,9 @@ class Teletext:
         return bool(self.visible and self.page == P_NEWS_AI)
 
     def is_chat(self) -> bool:
-        """True while the assistant's page is the one on screen. The numpad
-        means different things there, so the router has to be able to ask."""
-        return bool(self.visible and self.page == P_CHAT)
+        """True while either talking page is on screen. The numpad means
+        different things there, so the router has to be able to ask."""
+        return bool(self.visible and self.page in (P_CHAT, P_RPG))
 
     # ---- ChatCRT News ---------------------------------------------------
     # One page, five levels deep: sections -> stories -> one story -> one
@@ -1686,7 +1691,8 @@ class Teletext:
                          "cands": [], "ci": 0, "mt": None, "job": None,
                          "poll": 0.0, "scroll": 0, "opts": [], "oi": 0,
                          "turn": 0, "turns": 7, "mood": 0, "premise": "",
-                         "end": False, "session": ""}
+                         "end": False, "session": "",
+                         "kind": "rpg" if self.page == P_RPG else "chat"}
             # ChatCRT opens the conversation itself rather than sitting there
             # waiting -- it is a television, it has opinions
             self._chat_ask(start=True)
@@ -1736,7 +1742,7 @@ class Teletext:
                 for who, t in c["log"][-8:-1]]
         try:
             body = json.dumps({"text": text, "history": hist,
-                               "start": start,
+                               "start": start, "kind": c.get("kind", "rpg"),
                                "session": c.get("session", "")}).encode()
             req = urllib.request.Request(
                 "%s/chat" % self.broadcaster, data=body,
@@ -1755,7 +1761,7 @@ class Teletext:
         highlighted option, which is the ordinary way to talk to ChatCRT."""
         c = self.chat
         self._chat_commit()
-        if c["end"]:
+        if c["end"] and c.get("kind") == "rpg":
             self.chat = None            # a new episode, new premise
             self._chat_init()
             return
@@ -1795,8 +1801,9 @@ class Teletext:
         scheme, lang = CHAT_MODES[c["mode"]]
         pg = blank_page()
         header(pg, self.page, None)
-        put(pg, 2, 2, alpha(CYAN) + DH + T("ChatCRT"))
-        if c["premise"]:
+        rpg = c.get("kind") == "rpg"
+        put(pg, 2, 2, alpha(CYAN) + DH + T("ChatRPG" if rpg else "ChatCRT"))
+        if rpg and c["premise"]:
             mood = c["mood"]
             bar = ("+" * mood) if mood > 0 else ("-" * -mood)
             put(pg, 4, 1, alpha(MAGENTA) +
@@ -1842,7 +1849,7 @@ class Teletext:
                                      "4 GHI   5 JKL   6 MNO",
                                      "1 PQRS  2 TUV   3 WXYZ")):
                 put(pg, 19 + k, 8, alpha(CYAN) + T(row))
-        if c["end"]:
+        if c["end"] and rpg:
             put(pg, 18, 1, alpha(YELLOW) + NEWBG + alpha(BLACK) +
                 T(" SENDESCHLUSS "))
             put(pg, 21, 2, alpha(CYAN) + T("ENTER = neue Folge   C = zur}ck"
@@ -2510,10 +2517,170 @@ class Teletext:
         ("3", "Seiten neu laden"),
         ("4", "Server pr}fen".replace("}", chr(0xFC))),
         ("5", "Erfundene Seiten l|schen".replace("|", chr(0xF6))),
+        ("9", "Raspberry Pi pr}fen".replace("}", chr(0xFC))),
+        ("0", "Bluetooth koppeln"),
         ("6", "TelecommanderOS neu"),
         ("7", "Raspberry Pi neu starten"),
         ("8", "Fernseher ausschalten"),
     ]
+
+    P_STATUS = 501
+    P_BLUE = 502
+
+    @staticmethod
+    def _pi_health():
+        """Voltage, heat and throttling, straight from the firmware.
+
+        `throttled` is a bitmask and the two halves mean different things:
+        the low bits are what is happening NOW, bits 16-19 are what has
+        happened at any point since boot. A set history bit with a clear
+        current bit means the power was bad earlier -- worth showing, but not
+        the same as a problem right now.
+        """
+        def vcgen(what):
+            try:
+                out = subprocess.run(["vcgencmd", what], capture_output=True,
+                                     text=True, timeout=5).stdout.strip()
+                return out.split("=", 1)[1] if "=" in out else out
+            except (OSError, subprocess.TimeoutExpired, IndexError):
+                return ""
+        rows = []
+        t = vcgen("measure_temp").replace("'C", " C")
+        rows.append(("Temperatur", t or "?", GREEN if t and
+                     float(t.split()[0] or 0) < 70 else YELLOW))
+        volt = vcgen("measure_volts core")
+        rows.append(("Kernspannung", volt or "?", WHITE))
+        raw = vcgen("get_throttled")
+        try:
+            bits = int(raw, 16)
+        except ValueError:
+            bits = -1
+        if bits < 0:
+            rows.append(("Stromversorgung", "unbekannt", YELLOW))
+        else:
+            now_bad = bits & 0xF
+            ever_bad = (bits >> 16) & 0xF
+            rows.append(("Spannung jetzt",
+                         "zu niedrig" if bits & 0x1 else "in Ordnung",
+                         RED if bits & 0x1 else GREEN))
+            rows.append(("Drosselung jetzt",
+                         "ja" if now_bad & 0xC else "nein",
+                         RED if now_bad & 0xC else GREEN))
+            rows.append(("Seit dem Start",
+                         "schon mal zu wenig" if ever_bad & 0x1 else "sauber",
+                         YELLOW if ever_bad & 0x1 else GREEN))
+        try:
+            up = float(open("/proc/uptime").read().split()[0])
+            rows.append(("Laufzeit", "%d h %d min" % (up // 3600,
+                                                      (up % 3600) // 60), WHITE))
+        except (OSError, ValueError):
+            pass
+        try:
+            with open("/proc/loadavg") as fh:
+                rows.append(("Last", fh.read().split()[0], WHITE))
+        except OSError:
+            pass
+        return rows
+
+    def _page_status(self):
+        pg = blank_page()
+        header(pg, self.page)
+        put(pg, 2, 2, alpha(YELLOW) + DH + T("RASPBERRY PI"))
+        r = 6
+        for label, value, colour in self._pi_health():
+            put(pg, r, 2, alpha(CYAN) + T(label))
+            put(pg, r, 22, alpha(colour) + T(str(value)[:16]))
+            r += 2
+        put(pg, 21, 2, alpha(CYAN) + T("500 = Einstellungen"))
+        return pg
+
+    # -- bluetooth ---------------------------------------------------------
+    def _bt(self, *args, timeout=8):
+        try:
+            return subprocess.run(["bluetoothctl"] + list(args),
+                                  capture_output=True, text=True,
+                                  timeout=timeout).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return ""
+
+    def bt_scan(self):
+        """Look for anything advertising nearby, in the background.
+
+        bluetoothctl blocks for the whole scan, and the interface must not,
+        so it runs on a thread and the page shows what has turned up so far.
+        """
+        if self._bt_busy:
+            return
+        self._bt_busy = True
+
+        def _run():
+            try:
+                self._bt("--timeout", "10", "scan", "on", timeout=20)
+                self._bt_seen = self._bt_devices()
+            finally:
+                self._bt_busy = False
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _bt_devices(self):
+        out = []
+        for line in self._bt("devices").splitlines():
+            parts = line.split(None, 2)
+            if len(parts) >= 3 and parts[0] == "Device":
+                out.append((parts[1], parts[2][:24]))
+        return out[:9]
+
+    def _page_bluetooth(self):
+        pg = blank_page()
+        header(pg, self.page)
+        put(pg, 2, 2, alpha(YELLOW) + DH + T("BLUETOOTH"))
+        info = self._bt("show")
+        powered = "Powered: yes" in info
+        if not info:
+            put(pg, 6, 2, alpha(RED) + T("Kein Adapter gefunden."))
+            put(pg, 8, 2, alpha(WHITE) + T("Der Stick steckt nicht oder"))
+            put(pg, 9, 2, alpha(WHITE) + T("bekommt zu wenig Strom."))
+            put(pg, 21, 2, alpha(CYAN) + T("500 = Einstellungen"))
+            return pg
+        put(pg, 5, 2, alpha(CYAN) + T("Adapter") +
+            alpha(GREEN if powered else RED) +
+            T("        " + ("an" if powered else "aus")))
+        devs = self._bt_seen or self._bt_devices()
+        r = 7
+        for i, (mac, name) in enumerate(devs):
+            sel = str(i + 1) == self._bt_sel
+            mark = (alpha(WHITE) + NEWBG + alpha(BLACK)) if sel else alpha(WHITE)
+            put(pg, r, 1, mark + T((" %d %s " % (i + 1, name))[:36]))
+            r += 1
+        if not devs:
+            put(pg, 8, 2, alpha(CYAN) +
+                T("Suche l{uft ...".replace("{", chr(0xE4)) if self._bt_busy
+                  else "Nichts gefunden."))
+        put(pg, 18, 2, alpha(GREEN) + T("1-9") + alpha(WHITE) + T(" ausw{hlen"
+                                                                 .replace("{", chr(0xE4))))
+        put(pg, 19, 2, alpha(GREEN) + T("ENTER") + alpha(WHITE) +
+            T(" koppeln und verbinden"))
+        put(pg, 20, 2, alpha(GREEN) + T("0") + alpha(WHITE) + T(" neu suchen"))
+        if self._bt_msg:
+            put(pg, 22, 2, alpha(YELLOW) + T(self._bt_msg[:36]))
+        return pg
+
+    def bt_pair(self, idx):
+        devs = self._bt_seen or self._bt_devices()
+        if not (0 <= idx < len(devs)):
+            return
+        mac, name = devs[idx]
+        self._bt_msg = "koppelt %s ..." % name[:20]
+        self.repaint()
+
+        def _run():
+            self._bt("pair", mac, timeout=25)
+            self._bt("trust", mac, timeout=10)
+            out = self._bt("connect", mac, timeout=25)
+            ok = "successful" in out.lower() or "Connected: yes" in out
+            self._bt_msg = ("%s verbunden" if ok else "%s ging nicht") % name[:18]
+            if self.visible:
+                self.repaint()
+        threading.Thread(target=_run, daemon=True).start()
 
     def _page_settings(self):
         pg = blank_page()
@@ -2598,6 +2765,16 @@ class Teletext:
             subprocess.Popen(["systemctl", "restart", "retrokb"])
             return "OS startet neu ..."
 
+        if n == "9":
+            self._go(self.P_STATUS)
+            return ""
+
+        if n == "0":
+            self._bt_seen, self._bt_sel, self._bt_msg = [], "", "sucht ..."
+            self.bt_scan()
+            self._go(self.P_BLUE)
+            return ""
+
         if n == "7":
             if not self._reboot_armed:
                 self._reboot_armed = True
@@ -2662,7 +2839,11 @@ class Teletext:
             pg = self._page_now()
         elif self.page == P_SET:
             pg = self._page_settings()
-        elif self.page == P_CHAT:
+        elif self.page == self.P_STATUS:
+            pg = self._page_status()
+        elif self.page == self.P_BLUE:
+            pg = self._page_bluetooth()
+        elif self.page in (P_CHAT, P_RPG):
             pg = self._page_chat()
         elif self.page == P_NEWS_AI:
             pg = self._page_news()
@@ -3294,7 +3475,29 @@ class Teletext:
                                                                     "clear"):
             self._news_key(name)
             return
-        if self.page == P_CHAT and self.visible and name not in ("c", "clear"):
+        if self.chat and self.page not in (P_CHAT, P_RPG):
+            self.chat = None            # the other one starts its own
+        if self.page == self.P_BLUE and self.visible \
+                and name not in ("c", "clear"):
+            if name == "0":
+                self._bt_seen, self._bt_msg = [], "sucht ..."
+                self.bt_scan()
+            elif name.isdigit():
+                self._bt_sel = name
+            elif name in ("next", "prev"):
+                devs = self._bt_seen or self._bt_devices()
+                if devs:
+                    i = int(self._bt_sel or 1) - 1
+                    i = (i + (1 if name == "next" else -1)) % len(devs)
+                    self._bt_sel = str(i + 1)
+            elif name == "enter" and self._bt_sel:
+                self.bt_pair(int(self._bt_sel) - 1)
+            elif name == "back":
+                self._go(P_SET)
+            self.repaint()
+            return
+        if self.page in (P_CHAT, P_RPG) and self.visible \
+                and name not in ("c", "clear"):
             # On the chat page the digits ARE the keyboard, so nothing else
             # can have them -- no page numbers, no subpage stepping. C is the
             # single way out, exactly as it is in the game.

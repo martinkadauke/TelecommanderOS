@@ -49,7 +49,9 @@ EXCLUDE_DIRS = {"bonus", "extras", "extra", "featurettes", "sample", "samples",
 EXTS = (".mkv", ".mp4", ".m4v", ".avi")
 # Only the curated selection is broadcast (the full set is 1346 ROMs).
 ROM_ROOT = "/mnt/user/Games/Emulation/NES/Auswahl/"
-P_GAMES = 400
+P_GAMES = 400          # the menu
+P_ROMS = 401           # the ROM list itself, spilling over subpages
+P_RPG = 410            # ChatRPG, rendered by the receiver
 
 # --- reddit as teletext news ---------------------------------------------
 # Reddit's JSON API is gated now (403 for anything that is not a browser,
@@ -693,8 +695,25 @@ def crt_new_session():
     return sid
 
 
-def crt_system(sid):
+CRT_CHAT_RULES = (
+    "Der Zuschauer spricht mit dir und erwartet echte Antworten. Wenn er "
+    "etwas fragt, ANTWORTE WIRKLICH und richtig -- die Rolle ist die Stimme, "
+    "nicht eine Ausrede, um auszuweichen. Sag es in deinen Worten, mit deinen "
+    "Vergleichen von frueher, aber sag es. Wenn du etwas nicht weisst, gib es "
+    "zu, statt es zu erfinden. "
+    'Antworte AUSSCHLIESSLICH als JSON: {"say": "...", "options": '
+    '["...", "...", "..."]}. say hoechstens vier kurze Saetze. options sind '
+    "drei kurze Dinge, die der ZUSCHAUER als naechstes sagen oder fragen "
+    "koennte, je hoechstens 30 Zeichen. Kein Markdown, keine Emojis, keine "
+    "Sonderzeichen ausser normaler Interpunktion. Zeile 37 Zeichen breit.")
+
+
+def crt_system(sid, kind="rpg"):
     ses = _crt_sessions.get(sid)
+    if kind == "chat":
+        # same television, no game: no premise, no secret goal, no turn count.
+        # It is there to be talked to and to be useful when asked.
+        return CRT_PERSONA + " " + CRT_CHAT_RULES
     if not ses:
         return CRT_PERSONA + " " + CRT_RULES
     import random as _r
@@ -775,7 +794,8 @@ def _chat_run(jid, messages):
     # to gain from a progressive fill, and half a JSON object looks broken
     job["text"], job["options"] = chat_parse(job["raw"])
     job["mood"], job["end"] = chat_state(job["raw"])
-    ses = _crt_sessions.get(job.get("sid"))
+    ses = _crt_sessions.get(job.get("sid")) if job.get("kind") != "chat" \
+        else None
     if ses:
         ses["turn"] += 1
         ses["mood"] = max(-6, min(6, ses["mood"] + job["mood"]))
@@ -839,18 +859,20 @@ def chat_clean(s):
     return re.sub(r"\s+", " ", "".join(out)).strip()
 
 
-def chat_start(text, history, opener=False, sid=""):
+def chat_start(text, history, opener=False, sid="", kind="rpg"):
     _chat_seq[0] += 1
     jid = "j%d" % _chat_seq[0]
-    msgs = [{"role": "system", "content": crt_system(sid)}]
+    msgs = [{"role": "system", "content": crt_system(sid, kind)}]
     if opener:
-        text = CHAT_OPENER
+        text = (CHAT_OPENER if kind != "chat" else
+                "(Der Zuschauer schaltet dich ein. Begruesse ihn kurz und "
+                "frag, was er wissen will.)")
     for h in (history or [])[-8:]:
         role = "assistant" if h.get("role") == "assistant" else "user"
         msgs.append({"role": role, "content": str(h.get("text", ""))[:800]})
     msgs.append({"role": "user", "content": text})
     _chat_jobs[jid] = {"raw": "", "text": "", "options": [], "done": False,
-                       "sid": sid}
+                       "sid": sid, "kind": kind}
     for old_id in list(_chat_jobs)[:-6]:        # keep only the recent few
         _chat_jobs.pop(old_id, None)
     threading.Thread(target=_chat_run, args=(jid, msgs), daemon=True).start()
@@ -2993,8 +3015,24 @@ def gen_games():
             links[str(i + 1)] = {"rom": ROM_ROOT + f, "row": row}
         put(pg, 20, 2, alpha(WHITE) + T("Steuerung: Joystick + A B"))
         put(pg, 21, 2, alpha(CYAN) + T("Nr + ENTER startet, C beendet"))
-        save_page(P_GAMES, s, pg, links)
-    for s in range(nsub + 1, page_subs(P_GAMES) + 1):
+        save_page(P_ROMS, s, pg, links)
+    for s in range(nsub + 1, page_subs(P_ROMS) + 1):
+        os.remove(os.path.join(PAGES, "%03d.%d.tt" % (P_ROMS, s)))
+    # 400 is now a choice of games, not a list of cartridges
+    pg = blank()
+    hdr(pg, "SPIELE")
+    put(pg, 5, 1, alpha(CYAN) + T(" 1 ") + alpha(WHITE) + T("ChatRPG") +
+        b"." * 19 + alpha(CYAN) + T("410"))
+    put(pg, 7, 1, alpha(CYAN) + T(" 2 ") + alpha(WHITE) +
+        T("Nintendo Entertainment") + b"." * 4 + alpha(CYAN) + T("401"))
+    put(pg, 8, 5, alpha(WHITE) + T("System"))
+    put(pg, 12, 2, alpha(WHITE) + T("ChatRPG spielt eine Folge mit"))
+    put(pg, 13, 2, alpha(WHITE) + T("Ihnen. %d Module liegen bereit."
+                                    % len(roms)))
+    put(pg, 21, 2, alpha(CYAN) + T("Nr + ENTER"))
+    save_page(P_GAMES, 1, pg, {"1": {"page": P_RPG, "row": 5},
+                               "2": {"page": P_ROMS, "row": 7}})
+    for s in range(2, page_subs(P_GAMES) + 1):
         os.remove(os.path.join(PAGES, "%03d.%d.tt" % (P_GAMES, s)))
     return len(roms)
 
@@ -3069,10 +3107,10 @@ def generate():
                 ("Serien", "300", GREEN),
                 ("Musik", "600", WHITE),
                 ("Spiele", "400", CYAN),
+                ("ChatCRT", "950", GREEN),
                 ("Fernsehen", "800", YELLOW),
                 ("Radio", "900", MAGENTA),
                 ("News", "700", WHITE),
-                ("ChatCRT", "950", CYAN),
                 ("Einstellungen", "500", MAGENTA),
                 ("Bedienung", "101", YELLOW)]
         r = 6
@@ -3476,11 +3514,12 @@ class Handler(BaseHTTPRequestHandler):
             opener = bool(d.get("start"))
             if not text and not opener:
                 return self._json({"error": "empty"}, 400)
+            kind = "chat" if str(d.get("kind")) == "chat" else "rpg"
             sid = str(d.get("session") or "")
-            if opener or sid not in _crt_sessions:
+            if kind == "rpg" and (opener or sid not in _crt_sessions):
                 sid = crt_new_session()
             return self._json({"id": chat_start(text, d.get("history"),
-                                                opener, sid),
+                                                opener, sid, kind),
                                "session": sid})
         if path == "/tt/scores":
             try:
