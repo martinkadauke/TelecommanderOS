@@ -149,6 +149,15 @@ MUSIC_ROOT = "/mnt/user/Music/"
 MUSIC_EXTS = (".mp3", ".m4a", ".flac", ".ogg", ".oga", ".wav", ".wma", ".mp2")
 P_MUSIC = 600
 P_MUSIC_A = 601
+# The index is the numpad itself: press the key the artist's first letter sits
+# on. Page 60N is literally key N, so "2 ENTER" and typing "602" are the same
+# thing. 7 has no letters on a phone, so it takes everything that is not one.
+MUSIC_KEYS = [
+    ("7", "0-9", ""),
+    ("8", "ABC", "ABC"), ("9", "DEF", "DEF"),
+    ("4", "GHI", "GHI"), ("5", "JKL", "JKL"), ("6", "MNO", "MNO"),
+    ("1", "PQRS", "PQRS"), ("2", "TUV", "TUV"), ("3", "WXYZ", "WXYZ"),
+]
 P_MUSIC_ALBUMS = 640
 P_MUSIC_TRACKS = 641
 
@@ -187,8 +196,12 @@ def music_artists():
 
 
 def music_bucket(name):
+    """Which numpad key an artist sits under."""
     c = (name or " ")[:1].upper()
-    return ord(c) - 65 if "A" <= c <= "Z" else 26
+    for key, _label, letters in MUSIC_KEYS:
+        if letters and c in letters:
+            return key
+    return "7"
 
 
 def music_dir(sel):
@@ -205,33 +218,42 @@ def music_dir(sel):
 
 
 def music_index_page():
+    counts = {}
+    for a in music_artists():
+        k = music_bucket(a)
+        counts[k] = counts.get(k, 0) + 1
     pg = blank()
     hdr(pg, "MUSIK")
     links = {}
-    counts = {}
-    for a in music_artists():
-        counts[music_bucket(a)] = counts.get(music_bucket(a), 0) + 1
-    for i in range(27):
-        letter = chr(65 + i) if i < 26 else "0-9"
-        # 7 cells per entry, not 6: the two colour attributes each occupy a
-        # character cell of their own, and at 6 they overwrote the next
-        # entry's letter
-        row, col = 5 + i // 5, 1 + (i % 5) * 7
-        put(pg, row, col, alpha(CYAN) + T("%3d" % (P_MUSIC_A + i)) +
-            alpha(WHITE if counts.get(i) else BLUE) + T(" " + letter))
-        links[str(i + 1)] = {"page": P_MUSIC_A + i}
-    put(pg, 13, 2, alpha(WHITE) + T("%d Interpreten" % len(music_artists())))
-    put(pg, 20, 2, alpha(CYAN) + T("Seitennummer tippen = Buchstabe"))
+    # drawn in the numpad's own shape, so the page looks like the thing in
+    # your hand: 789 on top, 0 underneath
+    grid = [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]
+    labels = {k: (lab, cnt) for k, lab, _l in MUSIC_KEYS
+              for cnt in [counts.get(k, 0)]}
+    for r, row in enumerate(grid):
+        for c, key in enumerate(row):
+            lab, cnt = labels.get(key, ("", 0))
+            # the digit on its own line with the letters underneath, the way
+            # they sit on the key itself
+            top, left = 5 + r * 4, 3 + c * 12
+            put(pg, top, left, alpha(YELLOW) + T(key))
+            put(pg, top + 1, left, alpha(WHITE if cnt else BLUE) + T(lab))
+            if cnt:
+                put(pg, top + 1, left + 6, alpha(CYAN) + T("%d" % cnt))
+            links[key] = {"page": P_MUSIC_A + int(key) - 1, "row": top}
+    put(pg, 18, 2, alpha(WHITE) + T("%d Interpreten" % len(music_artists())))
+    put(pg, 20, 2, alpha(CYAN) + T("Taste + ENTER, wie beim Tippen"))
     put(pg, 21, 2, alpha(CYAN) + T("ENTER ohne Auswahl = Zufall"))
     return pg, 1, links
 
 
 def music_letter_page(num, sub):
-    i = num - P_MUSIC_A
-    if not (0 <= i < 27):
+    key = str(num - P_MUSIC_A + 1)
+    entry = next((e for e in MUSIC_KEYS if e[0] == key), None)
+    if entry is None:
         return None, 1, {}
-    letter = chr(65 + i) if i < 26 else "0-9"
-    names = [a for a in music_artists() if music_bucket(a) == i]
+    letter = entry[1]
+    names = [a for a in music_artists() if music_bucket(a) == key]
     total = max(1, (len(names) + PER_PAGE - 1) // PER_PAGE)
     sub = min(max(1, sub), total)
     pg = blank()
