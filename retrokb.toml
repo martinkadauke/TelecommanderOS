@@ -101,8 +101,8 @@ KEY_7 = "tv_tt_7"
 KEY_8 = "tv_tt_8"
 KEY_9 = "tv_tt_9"
 KEY_ENTER = "tv_playpause"
-KEY_MINUS = "tv_tt_minus"
-KEY_EQUAL = "tv_tt_plus"
+KEY_MINUS = "tv_tt_prev"    # same meaning as the numpad divide: move back
+KEY_EQUAL = "tv_tt_next"    # same meaning as the numpad times: move on
 
 # --- 8BitDo Retro 18 Numpad via 2.4GHz dongle (measured 2026-08-18):
 # digits/ENTER/+/- emit standard KP codes; the C key emits KEY_ESC (handled

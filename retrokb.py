@@ -1002,77 +1002,53 @@ class Service:
             return
 
         if target == "tv_dot":
-            # context key: OS open -> flip subpages; during playback ->
-            # aspect toggle. Runtime panscan is safe on the GL path.
-            if action == "press":
-                if self.tt.enabled and (self.tt.is_chat()
-                                        or self.tt.is_news()):
-                    self.tt.key("toggle")     # mode / scroll
-                elif self.tt.enabled and self.tt.visible:
-                    self.tt.key("plus")
+            # "more of this": the next subpage, or the next screenful of a
+            # long text. With nothing on a page it opens the OS on what is
+            # playing, which is the same idea -- more about this.
+            if action == "press" and self.tt.enabled:
+                if self.tt.visible:
+                    self.tt.key("more")
                 else:
-                    ps = self._tv_query("panscan")
-                    if isinstance(ps, (int, float)) and ps > 0.05:
-                        self._tv_cmd(["set_property", "panscan", 0.0])
-                        self._tv_cmd(["show-text", "Original (Letterbox)", 1500])
-                    else:
-                        self._tv_cmd(["set_property", "panscan",
-                                      self._auto_panscan()])
-                        self._tv_cmd(["show-text", "Vollbild", 1500])
+                    self.tt.key("now")
             return
 
         if target in self.TRANSPORT:
-            # While music plays the OS is not sitting IN FRONT of the player,
-            # it IS the player's screen: the analyser is the picture and the
-            # page rides on top of it in MIX. So the transport keys have to go
-            # on being transport keys, exactly as they do with the OS shut.
+            # ONE MEANING PER KEY, everywhere. The old table gave +/- to the
+            # volume in three places and to paging in three others, gave the
+            # dot four unrelated jobs and backspace three, and there was no
+            # reflex to build. Now: +/- is volume and only volume, divide and
+            # times move the selection through whatever list is on screen,
+            # ENTER does the selected thing, backspace undoes one step.
             music_on = self.tt.enabled and bool(self.tt.music)
             os_open = self.tt.enabled and self.tt.visible and not music_on
-            chat = self.tt.enabled and (self.tt.is_chat()
-                                        or self.tt.is_news())
+
             if target == "tv_volup":
-                if os_open:
-                    if action == "press":
-                        self.tt.key("plus") if chat else self.tt.page_step(1)
-                elif action in ("press", "hold"):
+                if action in ("press", "hold"):
                     self._volume_step(1)
             elif target == "tv_voldown":
-                if os_open:
-                    if action == "press":
-                        self.tt.key("minus") if chat else self.tt.page_step(-1)
-                elif action in ("press", "hold"):
+                if action in ("press", "hold"):
                     self._volume_step(-1)
             elif target == "tv_playpause" and action == "press":
+                # "do it". With the OS open that is the selection or the digits
+                # just typed; with it shut there is nothing to confirm, so it
+                # falls back to the only other yes/no on a television.
                 if os_open or self.tt.entry:
-                    # ENTER stays the terminator of a numeric command -- with
-                    # digits half-typed it must finish them even during music,
-                    # or 600 ENTER would be unreachable with a track running
                     self.tt.key("enter")
                 else:
                     self._tv_cmd(["cycle", "pause"])
-            elif target == "tv_prevfile" and action == "press":
-                if chat:
-                    self.tt.key("prev")       # previous T9 candidate
-                elif music_on:
-                    self._tv_cmd(["playlist-prev"])
-                elif self.tt.live and not os_open:
-                    self.tt.channel_step(-1)     # zap down
-                else:
+            elif target in ("tv_prevfile", "tv_nextfile") and action == "press":
+                step = -1 if target == "tv_prevfile" else 1
+                if self.tt.enabled and self.tt.visible:
+                    # a page is showing: move the highlight through its list
+                    self.tt.key("prev" if step < 0 else "next")
+                elif self.tt.enabled and self.tt.live:
+                    self.tt.channel_step(step)       # the list IS the channels
+                elif music_on or not self.tt.enabled:
+                    self._tv_cmd(["playlist-prev" if step < 0
+                                  else "playlist-next"])
+                elif step < 0:
                     self._transport_prev()
-            elif target == "tv_nextfile" and action == "press":
-                if chat:
-                    self.tt.key("next")       # next T9 candidate
-                elif music_on:
-                    self._tv_cmd(["playlist-next"])
-                elif os_open:
-                    # inside the OS, x shows the QR for whatever page offers
-                    # one (news articles) -- there is no "next file" to go to
-                    u = self.tt.qr_url()
-                    if u:
-                        self.tt.show_qr(u, "Beitrag auf dem Handy \u00f6ffnen")
-                elif self.tt.live:
-                    self.tt.channel_step(1)      # zap up
-                elif self.tt.enabled and not self.tt.random:
+                elif not self.tt.random:
                     self.tt.play_step(1)
                 else:
                     self._tv_cmd(["playlist-next"])

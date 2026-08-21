@@ -3086,15 +3086,13 @@ def generate():
         pg = blank()
         hdr(pg, "BEDIENUNG")
         rows = [("Ziffern", "Seite w{hlen".replace("{", "ä")),
-                ("ENTER", "Nr best{tigen / Pause".replace("{", "ä")),
-                ("C", "OS ein und aus"),
+                ("/ x", "Auswahl bewegen"),
+                ("ENTER", "ausw{hlen / Pause".replace("{", "ä")),
+                ("<-", "einen Schritt zur}ck".replace("}", "ü")),
+                (".", "weitere Unterseite"),
                 ("+ -", "lauter / leiser"),
-                ("/", "voriger Titel"), ("x", "n{chster Titel".replace("{", "ä")),
-                (".", "Unterseiten / Bildformat"),
-                ("111", "l{uft + Text (C)".replace("{", "ä")),
-                ("400 600", "Spiele / Musik"),
-                ("700 800", "News / Fernsehen"),
-                ("<-", "zur}ck".replace("}", "ü"))]
+                ("C", "OS ein und aus"),
+                ("100", "Start"), ("500", "Einstellungen")]
         r = 5
         for k, v in rows:
             put(pg, r, 2, alpha(CYAN) + T(k))

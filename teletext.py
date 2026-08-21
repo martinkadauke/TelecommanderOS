@@ -511,6 +511,7 @@ class Teletext:
         self._rand_ask = False         # the "play something random?" card
         self._remote_paint = 0.0       # backoff after a failed remote paint
         self.sel = ""                  # browser selection carried to the page
+        self.selkey = ""               # highlighted item on this page
         self.music = None              # the queued album, if music is playing
         self.music_base = 0            # its index of mpv playlist position 0
         self.music_secs = []           # length of each queued track
@@ -1523,7 +1524,7 @@ class Teletext:
                     if i == n["si"] % max(1, len(secs)) else alpha(CYAN)
                 put(pg, 6 + i * 2, 1, mark +
                     T(" %d %s " % (i + 1, sec.get("label", ""))[:36]))
-            put(pg, 21, 2, alpha(CYAN) + T("+ - w{hlen   ENTER  C zur}ck"
+            put(pg, 21, 2, alpha(CYAN) + T("/ x w{hlen  ENTER  C zur}ck"
                                            .replace("{", chr(0xE4))
                                            .replace("}", chr(0xFC))))
         elif lvl == "stories":
@@ -1537,7 +1538,7 @@ class Teletext:
                 if sel:
                     for k, ln in enumerate(self._wrap(st["teaser"], 34)[:2]):
                         put(pg, 7 + i * 3 + k, 3, alpha(CYAN) + T(ln))
-            put(pg, 21, 2, alpha(CYAN) + T("+ - w{hlen  ENTER  4 zur}ck"
+            put(pg, 21, 2, alpha(CYAN) + T("/ x w{hlen  ENTER  4 zur}ck"
                                            .replace("{", chr(0xE4))
                                            .replace("}", chr(0xFC))))
         elif lvl in ("story", "article"):
@@ -1596,7 +1597,7 @@ class Teletext:
                         else alpha(CYAN)
                     put(pg, 16 + k, 1, mark + T((" %s " % n["opts"][k])[:36]))
             put(pg, 20, 1, alpha(GREEN) + T(" 4 Zur}ck".replace("}", chr(0xFC))))
-            put(pg, 21, 2, alpha(CYAN) + T("+ - w{hlen   ENTER".replace(
+            put(pg, 21, 2, alpha(CYAN) + T("/ x w{hlen   ENTER".replace(
                 "{", chr(0xE4))))
         return pg
 
@@ -1605,8 +1606,8 @@ class Teletext:
         lvl = n["level"]
         if name in ("back",) or (name == "4" and lvl != "sections"):
             self._news_back()
-        elif name == "plus" or name == "minus":
-            step = 1 if name == "plus" else -1
+        elif name in ("next", "prev"):
+            step = 1 if name == "next" else -1
             if lvl == "sections" and n["sections"]:
                 n["si"] = (n["si"] + step) % len(n["sections"])
             elif lvl == "stories" and n["stories"]:
@@ -1615,7 +1616,7 @@ class Teletext:
                 n["oi"] = (n["oi"] + step) % len(n["opts"])
             else:
                 n["scroll"] = max(0, n["scroll"] + step)
-        elif name == "toggle":                  # the . key scrolls long text
+        elif name == "more":                    # the . key scrolls long text
             n["scroll"] = n["scroll"] + 6
             if n["scroll"] > 30:
                 n["scroll"] = 0
@@ -1760,7 +1761,7 @@ class Teletext:
             return
         text = c["input"].strip()
         if not text and c["opts"]:
-            text = c["opts"][c["oi"] % len(c["opts"])]
+            text = c["opts"][c["oi"] % max(1, len(c["opts"]))]
         if text:
             self._chat_ask(text)
 
@@ -1823,6 +1824,13 @@ class Teletext:
                         alpha(WHITE) + NEWBG + alpha(BLACK) + T(txt))
                 else:
                     put(pg, row, 1, alpha(CYAN) + T(txt))
+        n_opts = len(c["opts"]) + 1
+        if c["oi"] % n_opts == n_opts - 1:
+            put(pg, 18, 1, alpha(WHITE) + NEWBG + alpha(BLACK) +
+                T(" Eingabe: %s %s " % (scheme, lang.upper())))
+        else:
+            put(pg, 18, 1, alpha(MAGENTA) +
+                T(" Eingabe: %s %s" % (scheme, lang.upper())))
         typed = (c["input"] + self._chat_word())
         if typed or c["wkeys"]:
             put(pg, 19, 0, alpha(YELLOW) + T(">") + alpha(WHITE) +
@@ -1842,26 +1850,32 @@ class Teletext:
         elif c["job"]:
             put(pg, 21, 2, alpha(YELLOW) + T("ChatCRT denkt nach ..."))
         else:
-            put(pg, 21, 2, alpha(MAGENTA) + T("%s %s" % (scheme, lang)) +
-                alpha(CYAN) + T("  +- w{hlen  ENTER  . bl{ttert"
-                                .replace("{", chr(0xE4))))
+            put(pg, 21, 2, alpha(CYAN) +
+                T("/ x w{hlen   ENTER   . bl{ttert".replace("{", chr(0xE4))))
         return pg
 
     def _chat_key(self, name):
         c = self._chat_init()
         scheme, lang = CHAT_MODES[c["mode"]]
         now = time.monotonic()
-        if name in ("plus", "minus") and c["opts"]:
-            c["oi"] = (c["oi"] + (1 if name == "plus" else -1)) % len(c["opts"])
-        elif name == "toggle":                       # the "." key: scrolling
+        # The input-mode switch is the LAST item in the list rather than a key
+        # of its own: divide and times move the highlight everywhere else in
+        # the OS, so they move it here too, and the mode is just one more
+        # thing that can be selected.
+        n_opts = len(c["opts"]) + 1
+        if name in ("next", "prev"):
+            c["oi"] = (c["oi"] + (1 if name == "next" else -1)) % n_opts
+        elif name == "more":                         # the "." key: scrolling
             c["scroll"] = c["scroll"] + 3
             if c["scroll"] > max(0, len(c["log"]) * 3):
                 c["scroll"] = 0                      # wrap back to the newest
-        elif name == "prev":                         # the divide key
-            self._chat_commit()
-            c["mode"] = (c["mode"] + 1) % len(CHAT_MODES)
         elif name == "enter":
-            self._chat_send()
+            if c["oi"] % n_opts == n_opts - 1 and not c["input"] \
+                    and not c["wkeys"]:
+                self._chat_commit()
+                c["mode"] = (c["mode"] + 1) % len(CHAT_MODES)
+            else:
+                self._chat_send()
         elif name == "back":
             if c["wkeys"]:
                 c["wkeys"] = c["wkeys"][:-1]
@@ -1872,7 +1886,10 @@ class Teletext:
             elif c["input"]:
                 c["input"] = c["input"][:-1]
             c["mt"] = None
-        elif name == "next" and scheme == "T9" and c["cands"]:
+        elif name == "0" and scheme == "T9" and c["cands"] and c["wkeys"]:
+            # while a word is being typed, 0 walks the candidates before it
+            # commits one -- there is no spare key left and this is where a
+            # phone put "next word" too
             c["ci"] = (c["ci"] + 1) % len(c["cands"])
         elif name == "0":
             self._chat_commit(" ")
@@ -2679,6 +2696,7 @@ class Teletext:
                 spec = self._anim_spec()
                 if spec:
                     self._anim_apply(pg, spec)
+                self._paint_sel(pg)
                 if self.page == P_CREEP:
                     creep_header(pg, self.page, self.sub)
                 else:
@@ -3100,6 +3118,87 @@ class Teletext:
 
     # -- input -------------------------------------------------------------
 
+    def _open_item(self, sel):
+        """Act on one numbered choice.
+
+        Reached two ways: by typing the number, and by walking the
+        highlight onto it and pressing ENTER. Both had to end up in
+        the same place or the two would drift apart.
+        """
+        items = (self._meta or {}).get("links", {}).get("items", {})
+        tgt = items.get(sel) or items.get(str(int(sel)))
+        if tgt and tgt.get("live"):
+            name = ""
+            try:      # the row text is the channel name
+                raw = self._pcache.get((self.page, self.sub))
+                if raw:
+                    name = bytes(raw[1][int(tgt["row"])][3:]).decode(
+                        "latin1")[3:].strip()
+            except Exception:
+                pass
+            self.play_live(self._live_target(tgt),
+                           tgt.get("name") or name,
+                           tgt.get("epg", ""), tgt.get("ch", ""),
+                           self.page)
+            return
+        if tgt and "rom" in tgt and self.launch_game:
+            self.launch_game(tgt["rom"])
+            return
+        if tgt and "play" in tgt:
+            if is_music(tgt["play"]):
+                self._play_album(tgt["play"])
+            else:
+                self._play(tgt["play"], (self.page, self.sub, int(sel)))
+            return
+        if tgt and "sub" in tgt:
+            # jump to a subpage of THIS page -- how a news list opens
+            # the article it points at
+            self.sub = int(tgt["sub"])
+            self.repaint()
+            return
+        if tgt and "page" in tgt:
+            self._go(int(tgt["page"]), tgt.get("sel", ""))
+        else:
+            self.err = "ung}ltig".replace("}", "ü")
+
+
+    def _items(self):
+        """The numbered choices on the page showing, in order."""
+        items = ((self._meta or {}).get("links") or {}).get("items") or {}
+        try:
+            return [k for k in sorted(items, key=int)]
+        except (TypeError, ValueError):
+            return sorted(items)
+
+    def _move_sel(self, step):
+        """Walk the highlight through the page's list.
+
+        Typing the number still works and always will -- this is the same
+        choice made with two keys instead of three, which is what you want
+        when you are holding the remote rather than reading it.
+        """
+        keys = self._items()
+        if not keys:
+            return False
+        if self.selkey not in keys:
+            self.selkey = keys[0] if step > 0 else keys[-1]
+        else:
+            self.selkey = keys[(keys.index(self.selkey) + step) % len(keys)]
+        return True
+
+    def _paint_sel(self, pg):
+        """Mark the highlighted row. The links carry each item's row, which is
+        also how the watched-colours are painted, so nothing new is needed."""
+        items = ((self._meta or {}).get("links") or {}).get("items") or {}
+        meta = items.get(self.selkey)
+        if not isinstance(meta, dict):
+            return pg
+        row = meta.get("row")
+        if row is None or not (0 <= int(row) < 24):
+            return pg
+        pg[int(row)][0:3] = alpha(WHITE) + NEWBG + alpha(BLACK)
+        return pg
+
     def _go(self, page: int, sel: str = ""):
         self.seek_armed = False
         if page != P_SET:
@@ -3110,6 +3209,7 @@ class Teletext:
             self._hist.append((self.page, self.sub, self.sel))
             self._hist = self._hist[-32:]
         self.page, self.sub, self.sel = page, 1, sel
+        self.selkey = ""               # a new page starts with nothing picked
 
     def key(self, name: str):
         """'0'-'9', enter, clear, back, plus, minus, toggle, mix, now."""
@@ -3219,6 +3319,8 @@ class Teletext:
                 self.hide()
             return
         if name == "toggle":
+            # a keyboard-only alias for C, kept because ESC is not the only
+            # way people reach for "get me out of this"
             self.hide()
             return
         if name.isdigit():
@@ -3278,41 +3380,13 @@ class Teletext:
                 self.entry = ""
             elif self.entry:
                 sel, self.entry = self.entry, ""
-                items = (self._meta or {}).get("links", {}).get("items", {})
-                tgt = items.get(sel) or items.get(str(int(sel)))
-                if tgt and tgt.get("live"):
-                    name = ""
-                    try:      # the row text is the channel name
-                        raw = self._pcache.get((self.page, self.sub))
-                        if raw:
-                            name = bytes(raw[1][int(tgt["row"])][3:]).decode(
-                                "latin1")[3:].strip()
-                    except Exception:
-                        pass
-                    self.play_live(self._live_target(tgt),
-                                   tgt.get("name") or name,
-                                   tgt.get("epg", ""), tgt.get("ch", ""),
-                                   self.page)
-                    return
-                if tgt and "rom" in tgt and self.launch_game:
-                    self.launch_game(tgt["rom"])
-                    return
-                if tgt and "play" in tgt:
-                    if is_music(tgt["play"]):
-                        self._play_album(tgt["play"])
-                    else:
-                        self._play(tgt["play"], (self.page, self.sub, int(sel)))
-                    return
-                if tgt and "sub" in tgt:
-                    # jump to a subpage of THIS page -- how a news list opens
-                    # the article it points at
-                    self.sub = int(tgt["sub"])
-                    self.repaint()
-                    return
-                if tgt and "page" in tgt:
-                    self._go(int(tgt["page"]), tgt.get("sel", ""))
-                else:
-                    self.err = "ung}ltig".replace("}", "ü")
+                self._open_item(sel)
+            elif self.selkey:
+                # nothing typed, but something is highlighted: ENTER opens it,
+                # by handing the same code path the number it would have got
+                sel, self.entry = self.selkey, ""
+                self.selkey = ""
+                self._open_item(sel)
             else:
                 # ENTER is ONLY the terminator of a numeric command -- but
                 # on a list of things to watch, "ENTER without choosing" is
@@ -3320,10 +3394,22 @@ class Teletext:
                 if self._playables():
                     self._rand_ask = True
                 # ...otherwise it still does nothing (leaving the OS is C's).
+        elif name in ("next", "prev"):
+            # move the highlight; with no list to move through, nothing
+            self._move_sel(1 if name == "next" else -1)
+        elif name == "more":
+            # the next subpage, wrapping round
+            subs = (self._meta or {}).get("subs", 1)
+            self.sub = self.sub % max(1, subs) + 1
+            self.selkey = ""
         elif name == "back":
-            # a digit pending: delete it; otherwise walk the page history
+            # undo one step: a typed digit, then a highlight, then the page
             if self.entry:
                 self.entry = self.entry[:-1]
+            elif self.selkey:
+                self.selkey = ""
+            elif self.sub > 1:
+                self.sub -= 1
             elif self._hist:
                 self.page, self.sub, self.sel = self._hist.pop()
         elif name == "clear":
@@ -3331,14 +3417,9 @@ class Teletext:
                 self.entry = ""
             else:
                 self._go(100)
-        elif name == "plus":
-            # single-key subpage cycling (the numpad's . key): wrap around
-            subs = (self._meta or {}).get("subs", 1)
-            self.sub = self.sub % max(1, subs) + 1
-        elif name == "minus":
-            self.sub = max(1, self.sub - 1)
         elif name == "mix":
             self.mixmode = not self.mixmode
         elif name == "now":
             self.page, self.sub = P_NOW, 1
+            self.selkey = ""
         self.repaint()
